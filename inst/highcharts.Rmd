@@ -903,6 +903,65 @@ tibble(from = sample(letters[1:3],10,replace = TRUE),to = sample(letters[1:10],1
 
 A packed bubble series is a two dimensional series type, where each pointrenders a value in X, Y position. Each point is drawn as a bubblewhere the bubbles don't overlap with each other and the radiusof the bubble relates to the value.
 
+```{r}
+gapminder::gapminder %>%
+  filter(year == max(year)) %>%
+  hchart("packedbubble", hcaes(name = country, value = pop, z = pop, group = continent), dataLabels = list(enabled = TRUE, format = "{point.country}", filter = list(property = "y", operator = ">", value = 31210042))) %>%
+  hc_plotOptions(
+    packedbubble = list(
+      minSize = "30%", maxSize = "150%"
+    )
+  )
+
+
+
+
+
+hc <- gapminder::gapminder %>% 
+  filter(year == max(year)) %>% 
+  select(country, pop, continent) %>% hchart("packedbubble", hcaes(name = country, value = pop, group = continent))
+
+q95 <- as.numeric(quantile(gapminder$pop, .95))
+
+hc %>% 
+  hc_tooltip(
+    useHTML = TRUE,
+    pointFormat = "<b>{point.name}:</b> {point.value}"
+  ) %>% 
+  hc_plotOptions(
+    packedbubble = list(
+      maxSize = "150%",
+      zMin = 0,
+      layoutAlgorithm = list(
+        gravitationalConstant =  0.05,
+        splitSeries =  TRUE, # TRUE to group points
+        seriesInteraction = TRUE,
+        dragBetweenSeries = TRUE,
+        parentNodeLimit = TRUE
+      ),
+      dataLabels = list(
+        enabled = TRUE,
+        format = "{point.name}",
+        filter = list(
+          property = "y",
+          operator = ">",
+          value = q95
+        ),
+        style = list(
+          color = "black",
+          textOutline = "none",
+          fontWeight = "normal"
+        )
+      )
+    )
+  )  
+
+
+
+```
+
+
+
 ```{=html}
 
 <div>
