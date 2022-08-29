@@ -13,7 +13,7 @@ editor_options:
 
 
 ```{r setup, include=FALSE,echo = FALSE}
-## Global options
+### Global options
 knitr::opts_chunk$set(cache = FALSE,message = FALSE,warning = FALSE)
 devtools::load_all(".")
 library(htmltools)
@@ -36,7 +36,7 @@ hcExamples %>%
       div() %>% as.character() -> examples_out
     
     glue::glue(
-      "# {unique(.x$text)}
+      "## {unique(.x$text)}
       
       {unique(.x$desc)}
       
@@ -56,7 +56,7 @@ hcExamples %>%
   unlist() %>% 
   paste(collaspe = "\n\n\n") %>%
   clipr::write_clip()
-  # writeLines(sep = "\n\n\n")
+  ## writeLines(sep = "\n\n\n")
   
   map(~{
     div(
@@ -66,34 +66,34 @@ hcExamples %>%
   div()
   
 
-  # # map(~{
-  #   
-  #   # header <- unique(.x$text)
-  #   # descrip <- unique(.x$desc)
-  #   # examples <- unique(.x$example)
-  #   # links <- unique(.x$example)
-  #   # list_unique <- 
-  #     .x %>% lapply(unique)
-  #   
-  #   
-  #   
-  #   
-  #   # div(
-  #   #   h1(list_unique$text),
-  #   #   p(list_unique$text),
-  #   #   lapply(links_unique(tags$a(href  = .)
-  #   # )
-  #   # 
-  #   # .x %>% 
-  #   #   div(h1(unique(.x$text)),p(unique(.x$desc)),unique(.x$example) %>% map(~{tags$a(href = .x,target = "blank_")}))
-  # })
+  ## ## map(~{
+  ##   
+  ##   ## header <- unique(.x$text)
+  ##   ## descrip <- unique(.x$desc)
+  ##   ## examples <- unique(.x$example)
+  ##   ## links <- unique(.x$example)
+  ##   ## list_unique <- 
+  ##     .x %>% lapply(unique)
+  ##   
+  ##   
+  ##   
+  ##   
+  ##   ## div(
+  ##   ##   h1(list_unique$text),
+  ##   ##   p(list_unique$text),
+  ##   ##   lapply(links_unique(tags$a(href  = .)
+  ##   ## )
+  ##   ## 
+  ##   ## .x %>% 
+  ##   ##   div(h1(unique(.x$text)),p(unique(.x$desc)),unique(.x$example) %>% map(~{tags$a(href = .x,target = "blank_")}))
+  ## })
 
 ```
 
+# Charts
 
 
-
-# Theme
+## Theme
 
 ```{r}
 thm <- hc_theme(
@@ -138,9 +138,9 @@ highcharter::highcharts_demo() %>%
 
 
 
-# Line Charts
+## Line Charts
 
-## Basic Line Chart
+### Basic Line Chart
 
 ```{r}
 data(economics_long, package = "ggplot2")
@@ -153,7 +153,7 @@ hchart(economics_long2, "line", hcaes(x = date, y = value01, group = variable)) 
 ```
 
 
-## Colored Area and Colored Line
+### Colored Area and Colored Line
 
 ```{r}
 
@@ -176,7 +176,7 @@ hchart(df, "coloredarea", hcaes(x, y, segmentColor = col)) %>%
 
 ```
 
-# Scatter and Model Confidence Interval
+## Scatter and Model Confidence Interval
 
 ```{r}
 
@@ -207,7 +207,7 @@ hc %>%
     type = "spline",
     hcaes(x = speed, y = .fitted),
     name = "Fit",
-    id = "fit", # this is for link the arearange series to this one and have one legend
+    id = "fit", ## this is for link the arearange series to this one and have one legend
     lineWidth = 1,
     showInLegend = TRUE
     ) %>% 
@@ -216,10 +216,10 @@ hc %>%
     type = "arearange",
     name = "SE",
     hcaes(x = speed, low = .fitted - qtint*.se, high = .fitted + qtint*.se),
-    linkedTo = "fit", # here we link the legends in one.
+    linkedTo = "fit", ## here we link the legends in one.
     showInLegend = FALSE,
-    color = hex_to_rgba("gray", 0.2),  # put a semi transparent color
-    zIndex = -3 # this is for put the series in a back so the points are showed first
+    color = hex_to_rgba("gray", 0.2),  ## put a semi transparent color
+    zIndex = -3 ## this is for put the series in a back so the points are showed first
     )
 
 ```
@@ -234,7 +234,7 @@ data(favorite_bars)
 data(favorite_pies)
 
 highchart() %>%
-  # Data
+  ## Data
   hc_add_series(
     favorite_pies,
     "column", hcaes(
@@ -248,7 +248,7 @@ highchart() %>%
     ),
     name = "Bars"
   ) %>%
-  # Options for each type of series
+  ## Options for each type of series
   hc_plotOptions(
     series = list(
       showInLegend = FALSE, pointFormat = "{point.y}%", colorByPoint = TRUE
@@ -256,7 +256,7 @@ highchart() %>%
       center = c("30%", "10%"), size = 120, dataLabels = list(enabled = FALSE)
     )
   ) %>%
-  # Axis
+  ## Axis
   hc_yAxis(
     title = list(text = "percentage of tastiness"), labels = list(format = "{value}%"),
     max = 100
@@ -264,7 +264,7 @@ highchart() %>%
   hc_xAxis(
     categories = favorite_pies$pie
   ) %>%
-  # Titles, subtitle, caption and credits
+  ## Titles, subtitle, caption and credits
   hc_title(
     text = "How I Met Your Mother: Pie Chart Bar Graph"
   ) %>%
@@ -286,7 +286,7 @@ highchart() %>%
 ```
 
 
-# arcdiagram
+## arcdiagram
 
 Arc diagram series is a chart drawing style in which the vertices of the chart are positioned along a line on the Euclidean plane and the edges are drawn as a semicircle in one of the two half-planes delimited by the line, or as smooth curves formed by sequences of semicircles.
 
@@ -326,7 +326,7 @@ highchart(type = "chart") %>%
 
 
 
-# area
+## area
 
 The area series type.
 
@@ -350,7 +350,7 @@ economics_long %>%
 
 
 
-# arearange
+## arearange
 
 The area range series is a carteseian series with higher and lower values foreach point along an X axis, where the area between the values is shaded.
 
@@ -384,7 +384,7 @@ highchart() %>%
 
 
 
-# areaspline
+## areaspline
 
 The area spline series is an area series where the graph between thepoints is smoothed into a spline.
 
@@ -414,7 +414,8 @@ hchart(moose_and_deer,"areaspline",hcaes(x = year,y = value,group = key )) %>%
     layout = "vertical",
     align = "left", verticalAlign = "top",
     x = 120, y = 70, floating  = TRUE,
-    backgroundColor = "lightblue"
+    backgroundColor = "var(--accent-color)",
+    labels = list(style = list(color = "var(--page-background)"))
   ) %>% 
   hc_title(text = "Moose and deer hunting in Norway 2000-2021") %>%
   hc_subtitle(text="Source:SSB") %>% 
@@ -426,7 +427,7 @@ hchart(moose_and_deer,"areaspline",hcaes(x = year,y = value,group = key )) %>%
 ```
 
 
-# bar
+## bar
 
 A bar series is a special type of column series where the columns arehorizontal.
 
@@ -453,7 +454,7 @@ palmerpenguins::penguins %>%
 
 
 
-# bellcurve
+## bellcurve
 
 A bell curve is an areaspline series which represents the probabilitydensity function of the normal distribution. It calculates mean andstandard deviation of the base series data and plots the curve accordingto the calculated parameters.
 
@@ -467,7 +468,7 @@ A bell curve is an areaspline series which represents the probabilitydensity fun
 
 
 
-# boxplot
+## boxplot
 
 A box plot is a convenient way of depicting groups of data through theirfive-number summaries: the smallest observation (sample minimum), lowerquartile (Q1), median (Q2), upper quartile (Q3), and largest observation(sample maximum).
 
@@ -480,8 +481,8 @@ highchart() %>%
   ) %>% 
   hc_add_theme(thm)
 
- # %>% 
- #  hchart("boxplot",hcaes(x = group,y = n, group = group))
+ ## %>% 
+ ##  hchart("boxplot",hcaes(x = group,y = n, group = group))
 
 
 ```
@@ -497,7 +498,7 @@ highchart() %>%
 
 
 
-# bubble
+## bubble
 
 ```{r}
 structure(list(x = c(95, 86.5, 80.8, 80.4, 80.3, 78.4, 74.2, 
@@ -567,7 +568,7 @@ A bubble series is a three dimensional series type where each pointrenders an X,
 
 
 
-# bullet
+## bullet
 
 A bullet graph is a variation of a bar graph. The bullet graph featuresa single measure, compares it to a target, and displays it in the contextof qualitative ranges of performance that could be set usingplotBands on yAxis.
 
@@ -581,7 +582,7 @@ A bullet graph is a variation of a bar graph. The bullet graph featuresa single 
 
 
 
-# column
+## column
 
 Column series display one column per value along an X axis.
 
@@ -595,7 +596,7 @@ Column series display one column per value along an X axis.
 
 
 
-# columnpyramid
+## columnpyramid
 
 Column pyramid series display one pyramid per value along an X axis.To display horizontal pyramids, set chart.inverted totrue.
 
@@ -611,7 +612,7 @@ Column pyramid series display one pyramid per value along an X axis.To display h
 
 
 
-# columnrange
+## columnrange
 
 The column range is a cartesian series type with higher and lowerY values along an X axis. To display horizontal bars, setchart.inverted to true.
 
@@ -625,7 +626,7 @@ The column range is a cartesian series type with higher and lowerY values along 
 
 
 
-# cylinder
+## cylinder
 
 A cylinder graph is a variation of a 3d column graph. The cylinder graphfeatures cylindrical points.
 
@@ -639,7 +640,7 @@ A cylinder graph is a variation of a 3d column graph. The cylinder graphfeatures
 
 
 
-# dependencywheel
+## dependencywheel
 
 A dependency wheel chart is a type of flow diagram, where all nodes arelaid out in a circle, and the flow between the are drawn as link bands.
 
@@ -653,7 +654,7 @@ A dependency wheel chart is a type of flow diagram, where all nodes arelaid out 
 
 
 
-# dumbbell
+## dumbbell
 
 The dumbbell series is a cartesian series with higher and lower valuesfor each point along an X axis, connected with a line between thevalues.
 
@@ -668,7 +669,7 @@ The dumbbell series is a cartesian series with higher and lower valuesfor each p
 
 
 
-# dumbbell
+## dumbbell
 
 Requires highcharts-more.js and modules/dumbbell.js.
 
@@ -683,7 +684,7 @@ Requires highcharts-more.js and modules/dumbbell.js.
 
 
 
-# errorbar
+## errorbar
 
 Error bars are a graphical representation of the variability of data andare used on graphs to indicate the error, or uncertainty in a reportedmeasurement.
 
@@ -698,7 +699,7 @@ Error bars are a graphical representation of the variability of data andare used
 
 
 
-# funnel
+## funnel
 
 Funnel charts are a type of chart often used to visualize stages in asales project, where the top are the initial stages with the mostclients. It requires that the modules/funnel.js file is loaded.
 
@@ -712,7 +713,7 @@ Funnel charts are a type of chart often used to visualize stages in asales proje
 
 
 
-# funnel3d
+## funnel3d
 
 A funnel3d is a 3d version of funnel series type. Funnel charts area type of chart often used to visualize stages in a sales project,where the top are the initial stages with the most clients.
 
@@ -726,7 +727,7 @@ A funnel3d is a 3d version of funnel series type. Funnel charts area type of cha
 
 
 
-# funnel3d
+## funnel3d
 
 It requires that the highcharts-3d.js, cylinder.js andfunnel3d.js module are loaded.
 
@@ -740,7 +741,7 @@ It requires that the highcharts-3d.js, cylinder.js andfunnel3d.js module are loa
 
 
 
-# gauge
+## gauge
 
 Gauges are circular plots displaying one or more values with a dialpointing to values along the perimeter.
 
@@ -754,7 +755,7 @@ Gauges are circular plots displaying one or more values with a dialpointing to v
 
 
 
-# heatmap
+## heatmap
 
 A heatmap is a graphical representation of data where the individualvalues contained in a matrix are represented as colors.
 
@@ -769,7 +770,7 @@ A heatmap is a graphical representation of data where the individualvalues conta
 
 
 
-# heatmap
+## heatmap
 
 Requires modules/heatmap.
 
@@ -784,7 +785,7 @@ Requires modules/heatmap.
 
 
 
-# histogram
+## histogram
 
 A histogram is a column series which represents the distribution of thedata set in the base series. Histogram splits data into bins and showstheir frequencies.
 
@@ -798,7 +799,7 @@ A histogram is a column series which represents the distribution of thedata set 
 
 
 
-# item
+## item
 
 An item chart is an infographic chart where a number of items are laidout in either a rectangular or circular pattern. It can be used tovisualize counts within a group, or for the circular pattern, typicallya parliament.
 
@@ -814,7 +815,7 @@ An item chart is an infographic chart where a number of items are laidout in eit
 
 
 
-# item
+## item
 
 The circular layout has much in common with a pie chart. Many of the itemseries options, like center, size and data label positioning, areinherited from the pie series and don't apply for rectangular layouts.
 
@@ -830,7 +831,7 @@ The circular layout has much in common with a pie chart. Many of the itemseries 
 
 
 
-# line
+## line
 
 A line series displays information as a series of data points connected bystraight line segments.
 
@@ -844,7 +845,7 @@ A line series displays information as a series of data points connected bystraig
 
 
 
-# lollipop
+## lollipop
 
 The lollipop series is a carteseian series with a line anchored fromthe x axis and a dot at the end to mark the value.Requires highcharts-more.js, modules/dumbbell.js andmodules/lollipop.js.
 
@@ -859,7 +860,7 @@ The lollipop series is a carteseian series with a line anchored fromthe x axis a
 
 
 
-# networkgraph
+## networkgraph
 
 A networkgraph is a type of relationship chart, where connnections(links) attracts nodes (points) and other nodes repulse each other.
 
@@ -873,7 +874,7 @@ A networkgraph is a type of relationship chart, where connnections(links) attrac
 
 
 
-# organization
+## organization
 
 An organization chart is a diagram that shows the structure of anorganization and the relationships and relative ranks of its parts andpositions.
 
@@ -899,7 +900,7 @@ tibble(from = sample(letters[1:3],10,replace = TRUE),to = sample(letters[1:10],1
 
 
 
-# packedbubble
+## packedbubble
 
 A packed bubble series is a two dimensional series type, where each pointrenders a value in X, Y position. Each point is drawn as a bubblewhere the bubbles don't overlap with each other and the radiusof the bubble relates to the value.
 
@@ -921,7 +922,7 @@ hc <- gapminder::gapminder %>%
   filter(year == max(year)) %>% 
   select(country, pop, continent) %>% hchart("packedbubble", hcaes(name = country, value = pop, group = continent))
 
-q95 <- as.numeric(quantile(gapminder$pop, .95))
+q95 <- as.numeric(quantile(gapminder::gapminder$pop, .95))
 
 hc %>% 
   hc_tooltip(
@@ -934,7 +935,7 @@ hc %>%
       zMin = 0,
       layoutAlgorithm = list(
         gravitationalConstant =  0.05,
-        splitSeries =  TRUE, # TRUE to group points
+        splitSeries =  TRUE, ## TRUE to group points
         seriesInteraction = TRUE,
         dragBetweenSeries = TRUE,
         parentNodeLimit = TRUE
@@ -973,7 +974,7 @@ hc %>%
 
 
 
-# pareto
+## pareto
 
 A pareto diagram is a type of chart that contains both bars and a linegraph, where individual values are represented in descending order bybars, and the cumulative total is represented by the line.
 
@@ -987,7 +988,7 @@ A pareto diagram is a type of chart that contains both bars and a linegraph, whe
 
 
 
-# pie
+## pie
 
 A pie chart is a circular graphic which is divided into slices toillustrate numerical proportion.
 
@@ -1001,7 +1002,7 @@ A pie chart is a circular graphic which is divided into slices toillustrate nume
 
 
 
-# polygon
+## polygon
 
 A polygon series can be used to draw any freeform shape in the cartesiancoordinate system. A fill is applied with the color option, andstroke is applied through lineWidth and lineColor options.
 
@@ -1015,7 +1016,7 @@ A polygon series can be used to draw any freeform shape in the cartesiancoordina
 
 
 
-# pyramid
+## pyramid
 
 A pyramid series is a special type of funnel, without neck and reversedby default.
 
@@ -1029,7 +1030,7 @@ A pyramid series is a special type of funnel, without neck and reversedby defaul
 
 
 
-# pyramid3d
+## pyramid3d
 
 A pyramid3d is a 3d version of pyramid series type. Pyramid charts area type of chart often used to visualize stages in a sales project,where the top are the initial stages with the most clients.
 
@@ -1043,7 +1044,7 @@ A pyramid3d is a 3d version of pyramid series type. Pyramid charts area type of 
 
 
 
-# sankey
+## sankey
 
 
 
@@ -1072,7 +1073,7 @@ hchart(data_to_sankey(diamonds2), "sankey", name = "diamonds")
 
 
 
-# scatter
+## scatter
 
 A scatter plot uses cartesian coordinates to display values for twovariables for a set of data.
 
@@ -1086,7 +1087,7 @@ A scatter plot uses cartesian coordinates to display values for twovariables for
 
 
 
-# scatter3d
+## scatter3d
 
 A 3D scatter plot uses x, y and z coordinates to display values for threevariables for a set of data.
 
@@ -1101,7 +1102,7 @@ A 3D scatter plot uses x, y and z coordinates to display values for threevariabl
 
 
 
-# solidgauge
+## solidgauge
 
 A solid gauge is a circular gauge where the value is indicated by a filledarc, and the color of the arc may variate with the value.
 
@@ -1115,7 +1116,7 @@ A solid gauge is a circular gauge where the value is indicated by a filledarc, a
 
 
 
-# spline
+## spline
 
 A spline series is a special type of line series, where the segmentsbetween the data points are smoothed.
 
@@ -1129,7 +1130,7 @@ A spline series is a special type of line series, where the segmentsbetween the 
 
 
 
-# streamgraph
+## streamgraph
 
 A streamgraph is a type of stacked area graph which is displaced around acentral axis, resulting in a flowing, organic shape.
 
@@ -1143,7 +1144,7 @@ A streamgraph is a type of stacked area graph which is displaced around acentral
 
 
 
-# sunburst
+## sunburst
 
 A Sunburst displays hierarchical data, where a level in the hierarchy isrepresented by a circle. The center represents the root node of the tree.The visualization bears a resemblance to both treemap and pie charts.
 
@@ -1170,7 +1171,7 @@ hchart(dout, type = "sunburst")
 ```
 
 
-# tilemap
+## tilemap
 
 A tilemap series is a type of heatmap where the tile shapes areconfigurable.
 
@@ -1244,7 +1245,8 @@ hchart(tile_map_usa, "tilemap",dataLabels = list(enabled = TRUE, format = "{poin
   hc_subtitle(
     text = "Source: Wikipedia"
   ) %>% 
-  hc_add_theme(thm)
+  hc_add_theme(thm) %>% 
+  hc_size(width = 600,height = 600)
 
 ```
 
@@ -1265,7 +1267,7 @@ hchart(tile_map_usa, "tilemap",dataLabels = list(enabled = TRUE, format = "{poin
 
 
 
-# timeline
+## timeline
 
 The timeline series presents given events along a drawn line.
 
@@ -1281,7 +1283,7 @@ The timeline series presents given events along a drawn line.
 
 
 
-# treemap
+## treemap
 
 A treemap displays hierarchical data using nested rectangles. The datacan be laid out in varying ways depending on options.
 
@@ -1311,7 +1313,7 @@ hchart(dout, type = "treemap")
 
 
 
-# variablepie
+## variablepie
 
 A variable pie series is a two dimensional series type, where each pointrenders an Y and Z value.  Each point is drawn as a pie slice where thesize (arc) of the slice relates to the Y value and the radius of pieslice relates to the Z value.
 
@@ -1325,7 +1327,7 @@ A variable pie series is a two dimensional series type, where each pointrenders 
 
 
 
-# variwide
+## variwide
 
 A variwide chart (related to marimekko chart) is a column chart with avariable width expressing a third dimension.
 
@@ -1341,7 +1343,7 @@ A variwide chart (related to marimekko chart) is a column chart with avariable w
 
 
 
-# vector
+## vector
 
 A vector plot is a type of cartesian chart where each point has an X andY position, a length and a direction. Vectors are drawn as arrows.
 
@@ -1355,7 +1357,7 @@ A vector plot is a type of cartesian chart where each point has an X andY positi
 
 
 
-# venn
+## venn
 
 A Venn diagram displays all possible logical relations between acollection of different sets. The sets are represented by circles, andthe relation between the sets are displayed by the overlap or lack ofoverlap between them. The venn diagram is a special case of Eulerdiagrams, which can also be displayed by this series type.
 
@@ -1370,7 +1372,7 @@ A Venn diagram displays all possible logical relations between acollection of di
 
 
 
-# waterfall
+## waterfall
 
 A waterfall chart displays sequentially introduced positive or negativevalues in cumulative columns.
 
@@ -1386,7 +1388,7 @@ A waterfall chart displays sequentially introduced positive or negativevalues in
 
 
 
-# windbarb
+## windbarb
 
 Wind barbs are a convenient way to represent wind speed and direction inone graphical form. Wind direction is given by the stem direction, andwind speed by the number and shape of barbs.
 
@@ -1400,7 +1402,7 @@ Wind barbs are a convenient way to represent wind speed and direction inone grap
 
 
 
-# wordcloud
+## wordcloud
 
 A word cloud is a visualization of a set of words, where the size andplacement of a word is determined by how it is weighted.
 
@@ -1414,7 +1416,7 @@ A word cloud is a visualization of a set of words, where the size andplacement o
 
 
 
-# xrange
+## xrange
 
 The X-range series displays ranges on the X axis, typically timeintervals with a start and end date.
 
@@ -1449,8 +1451,6 @@ The X-range series displays ranges on the X axis, typically timeintervals with a
 
 
 ```{js}
-/*
-
 function resizedw(){
     $(".highchart, .highcharts-container, .highcharts-container > svg").each(function(){
     
@@ -1458,10 +1458,10 @@ function resizedw(){
           chartWidth = $(this).find("rect").width(), 
           mainWidth = $(".Content").width(), 
           newHeight = Math.round((chartHeight / chartWidth)*mainWidth);
-          
-      console.log(chartHeight,chartWidth,newHeight);
+         // "height": Math.round(((9 / 16) * mainWidth)) 
+      //console.log(chartHeight,chartWidth,newHeight);
        
-      $(this).css({"width":"100%","height": Math.round(((9 / 16) * mainWidth)) ,"max-width": "100%"});
+      $(this).css({"width":"100%","max-width": "100%"});
   })
 }
 
@@ -1474,7 +1474,7 @@ window.onresize = function(){
 window.dispatchEvent(new Event('resize'));
 
 
-*/
+
 
 
 ```
