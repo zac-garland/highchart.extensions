@@ -1,0 +1,1312 @@
+---
+title: ""
+date: "`r Sys.Date()`"
+output:
+  rmdformats::downcute:
+    self_contained: true
+    default_style: "dark"
+    downcute_theme: "chaos"
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r setup, include=FALSE,echo = FALSE}
+## Global options
+knitr::opts_chunk$set(cache = TRUE,message = FALSE,warning = FALSE)
+devtools::load_all(".")
+library(htmltools)
+
+```
+
+
+```{r,eval = FALSE}
+library(highcharter)
+library(tidyverse)
+
+hcExamples
+
+hcExamples %>% 
+  split(.$text) %>% 
+  map(~{
+    
+ unique(.x$example) %>% 
+      map(~{tags$a(basename(.x),href = .x,target = '_blank')}) %>% 
+      div() %>% as.character() -> examples_out
+    
+    glue::glue(
+      "# {unique(.x$text)}
+      
+      {unique(.x$desc)}
+      
+      ```{{=html}}
+      
+      {examples_out}
+      
+      ```
+      
+            
+            "
+    ) %>% 
+      str_trim()
+    
+  }) %>% 
+  
+  unlist() %>% 
+  paste(collaspe = "\n\n\n") %>%
+  clipr::write_clip()
+  # writeLines(sep = "\n\n\n")
+  
+  map(~{
+    div(
+      h1(unique(.x$text))
+    )
+  }) %>% 
+  div()
+  
+
+  # # map(~{
+  #   
+  #   # header <- unique(.x$text)
+  #   # descrip <- unique(.x$desc)
+  #   # examples <- unique(.x$example)
+  #   # links <- unique(.x$example)
+  #   # list_unique <- 
+  #     .x %>% lapply(unique)
+  #   
+  #   
+  #   
+  #   
+  #   # div(
+  #   #   h1(list_unique$text),
+  #   #   p(list_unique$text),
+  #   #   lapply(links_unique(tags$a(href  = .)
+  #   # )
+  #   # 
+  #   # .x %>% 
+  #   #   div(h1(unique(.x$text)),p(unique(.x$desc)),unique(.x$example) %>% map(~{tags$a(href = .x,target = "blank_")}))
+  # })
+
+```
+
+
+
+
+# Theme
+
+```{r}
+thm <- hc_theme(
+      colors = c("#7cb5ec", "#434348", "#90ed7d", "#f7a35c", "#8085e9", "#f15c80", 
+"#e4d354", "#2b908f", "#f45b5b", "#91e8e1"), chart = list(
+      backgroundColor = "var(--page-background)"
+    ), xAxis = list(
+      labels = list(style = list(color = "var(--text-color)")),
+      gridLineDashStyle = "Dash",
+      gridLineWidth = 1, gridLineColor = "var(--code-block-background)", lineColor = "var(--text-color)",
+      minorGridLineColor = "var(--text-color)", tickColor = "var(--text-color)", tickWidth = 1,
+      title = list(style = list(color = "var(--text-color)"))
+    ), yAxis = list(
+      labels = list(style = list(color = "var(--text-color)")),
+      gridLineDashStyle = "Dash",
+      gridLineWidth = 1, gridLineColor = "var(--code-block-background)", lineColor = "var(--text-color)",
+      minorGridLineColor = "var(--text-color)", tickColor = "var(--text-color)", tickWidth = 1,
+      title = list(style = list(color = "var(--text-color)"))    
+      ), legendBackgroundColor = "var(--page-background)",
+    background2 = "var(--page-background)", dataLabelsColor = "var(--text-color)", textColor = "var(--text-color)",
+    contrastTextColor = "var(--text-color)", maskColor = "rgba(255,255,255,0.3)",
+    title = list(style = list(color = "var(--text-color)")), subtitle = list(
+      style = list(color = "var(--text-color)")
+    ), legend = list(
+      itemStyle = list(
+        color = "var(--text-color)"
+      ), itemHoverStyle = list(color = "var(--text-color)"),
+      itemHiddenStyle = list(color = "var(--text-color)")
+    )
+
+)
+
+thm <- hc_theme_merge(
+  hc_theme_darkunica(),
+  thm
+)
+
+
+highcharter::highcharts_demo() %>%
+  hc_add_theme(thm)
+```
+
+
+
+# Line Charts
+
+## Basic Line Chart
+
+```{r}
+data(economics_long, package = "ggplot2")
+
+economics_long2 <- dplyr::filter(economics_long, variable %in% c("pop", "uempmed", "unemploy"))
+
+hchart(economics_long2, "line", hcaes(x = date, y = value01, group = variable)) %>% 
+  hc_add_theme(thm)
+
+```
+
+
+## Colored Area and Colored Line
+
+```{r}
+
+library(dplyr)
+
+set.seed(123); n <- 200; colors <- sample(viridisLite::cividis(5, end = .9))
+
+df <- tibble(
+  x = 1:n,
+  y = abs(arima.sim(n = n, model = list(ar = c(0.9)))) + 2,
+  y2 = 10 + y,
+  col = rep(colors, each = n/10, length.out = n)
+)
+
+hchart(df, "coloredarea", hcaes(x, y, segmentColor = col)) %>% 
+   hc_add_series(df, "coloredline", hcaes(x, y2 , segmentColor = col)) %>% 
+   hc_add_dependency("plugins/multicolor_series.js")  %>%
+  hc_add_theme(thm)
+
+
+```
+
+# Scatter and Model Confidence Interval
+
+```{r}
+
+library(broom)
+
+modlss <- loess(dist ~ speed, data = cars)
+
+fit <- arrange(augment(modlss), speed) %>% 
+  mutate(.se = predict(modlss, se = TRUE)$se.fit)
+
+head(fit)
+
+hc <- hchart(
+  cars,
+  type = "scatter",
+  hcaes(x = speed, y = dist),
+  name = "Speed and Stopping Distances of Cars",
+  showInLegend = TRUE
+  ) %>% 
+  hc_add_theme(thm)
+
+
+qtint <- qt(0.975, predict(modlss, se = TRUE)$df)
+
+hc %>%
+  hc_add_series(
+    fit,
+    type = "spline",
+    hcaes(x = speed, y = .fitted),
+    name = "Fit",
+    id = "fit", # this is for link the arearange series to this one and have one legend
+    lineWidth = 1,
+    showInLegend = TRUE
+    ) %>% 
+  hc_add_series(
+    fit,
+    type = "arearange",
+    name = "SE",
+    hcaes(x = speed, low = .fitted - qtint*.se, high = .fitted + qtint*.se),
+    linkedTo = "fit", # here we link the legends in one.
+    showInLegend = FALSE,
+    color = hex_to_rgba("gray", 0.2),  # put a semi transparent color
+    zIndex = -3 # this is for put the series in a back so the points are showed first
+    )
+
+```
+
+
+```{r}
+data(favorite_bars)
+data(favorite_pies)
+
+highchart() %>%
+  # Data
+  hc_add_series(
+    favorite_pies,
+    "column", hcaes(
+      x = pie, y = percent
+    ),
+    name = "Pie"
+  ) %>%
+  hc_add_series(
+    favorite_bars, "pie", hcaes(
+      name = bar, y = percent
+    ),
+    name = "Bars"
+  ) %>%
+  # Options for each type of series
+  hc_plotOptions(
+    series = list(
+      showInLegend = FALSE, pointFormat = "{point.y}%", colorByPoint = TRUE
+    ), pie = list(
+      center = c("30%", "10%"), size = 120, dataLabels = list(enabled = FALSE)
+    )
+  ) %>%
+  # Axis
+  hc_yAxis(
+    title = list(text = "percentage of tastiness"), labels = list(format = "{value}%"),
+    max = 100
+  ) %>%
+  hc_xAxis(
+    categories = favorite_pies$pie
+  ) %>%
+  # Titles, subtitle, caption and credits
+  hc_title(
+    text = "How I Met Your Mother: Pie Chart Bar Graph"
+  ) %>%
+  hc_subtitle(
+    text = "This is a bar graph describing my favorite pies
+    including a pie chart describing my favorite bars"
+  ) %>%
+  hc_caption(
+    text = "The values represented are in percentage of tastiness and awesomeness."
+  ) %>%
+  hc_credits(
+    enabled = TRUE, text = "Source: HIMYM", href = "https://www.youtube.com/watch?v=f_J8QU1m0Ng", style = list(fontSize = "12px")
+  ) %>%
+  hc_size(
+    height = 600
+  ) %>% 
+  hc_add_theme(thm)
+
+```
+
+
+# arcdiagram
+
+Arc diagram series is a chart drawing style in which the vertices of the chart are positioned along a line on the Euclidean plane and the edges are drawn as a semicircle in one of the two half-planes delimited by the line, or as smooth curves formed by sequences of semicircles.
+
+
+```{r,eval=FALSE}
+
+tibble(from = sample(letters),to = sample(letters[1:10],26,replace = TRUE),weight = sample(1:5,26,replace = TRUE)) %>%
+  rowid_to_column() %>% 
+  split(.$rowid) %>% 
+  map(~{
+    
+  })
+  highcharter::list_parse2() -> arc_data
+
+arc_data
+
+highchart(type = "chart") %>% 
+  hc_add_series(
+    list(
+      keys = c("from","to","weight"),
+      type = "arcdiagram",
+      offset = "65%",data = arc_data
+    )
+  ) %>% 
+  hc_add_theme(thm)
+
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/arc-diagram/" target="_blank">arc-diagram</a></div>
+</div>
+
+``` 
+
+
+
+# area
+
+The area series type.
+
+```{r}
+economics_long %>% 
+  hchart("area",hcaes(date,value01,group = variable)) %>% 
+  hc_add_theme(thm)
+
+
+
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/area-basic/" target="_blank">area-basic</a></div>
+</div>
+
+``` 
+
+
+
+# arearange
+
+The area range series is a carteseian series with higher and lower values foreach point along an X axis, where the area between the values is shaded.
+
+```{r}
+jsonlite::fromJSON("https://cdn.jsdelivr.net/gh/highcharts/highcharts@v7.0.0/samples/data/range.json") -> area_range_data
+
+highchart() %>% 
+  hc_add_series(data = as_tibble(area_range_data) %>% list_parse2(),type = "arearange") %>% 
+  hc_xAxis(
+    type = "datetime"
+  ) %>% 
+  hc_title(
+    text = "Temperature variation by day"
+  ) %>% 
+  hc_add_theme(thm)
+  
+```
+
+
+
+```{=html}
+
+
+
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/arearange/" target="_blank">arearange</a></div>
+</div>
+
+``` 
+
+
+
+# areaspline
+
+The area spline series is an area series where the graph between thepoints is smoothed into a spline.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/areaspline/" target="_blank">areaspline</a></div>
+</div>
+
+``` 
+
+```{r}
+moose_and_deer <- tibble(
+  year = c(2000:2020),
+  Moose = c(
+    38000, 37300, 37892, 38564, 36770, 36026, 34978, 35657, 35620, 35971, 36409, 36435, 34643, 34956, 33199, 31136, 30835, 31611, 30666, 30319, 31766
+  ), Deer = c(
+    22534, 23599, 24533, 25195, 25896, 27635, 29173, 32646, 35686, 37709, 39143, 36829, 35031, 36202, 35140, 33718, 37773, 42556, 43820, 46445, 50048
+  )
+) %>% 
+  gather(key,value,-year)
+
+
+
+hchart(moose_and_deer,"areaspline",hcaes(x = year,y = value,group = key )) %>% 
+  hc_legend(
+    layout = "vertical",
+    align = "left", verticalAlign = "top",
+    x = 120, y = 70, floating  = TRUE,
+    backgroundColor = "lightblue"
+  ) %>% 
+  hc_title(text = "Moose and deer hunting in Norway 2000-2021") %>%
+  hc_subtitle(text="Source:SSB") %>% 
+  hc_add_theme(thm)
+
+
+
+
+```
+
+
+# bar
+
+A bar series is a special type of column series where the columns arehorizontal.
+
+```{r}
+palmerpenguins::penguins %>%
+  group_by(species) %>%
+  summarize(flipper_length = mean(flipper_length_mm, na.rm = TRUE)) %>% 
+  hchart("bar",hcaes(species,flipper_length,color = I(viridis::viridis(3)))) %>%
+  hc_title(text = "Average Flipper Length by Penguin Species") %>% 
+  hc_add_theme(thm)
+
+
+```
+
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/bar-basic/" target="_blank">bar-basic</a></div>
+</div>
+
+``` 
+
+
+
+# bellcurve
+
+A bell curve is an areaspline series which represents the probabilitydensity function of the normal distribution. It calculates mean andstandard deviation of the base series data and plots the curve accordingto the calculated parameters.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/bellcurve/" target="_blank">bellcurve</a></div>
+</div>
+
+``` 
+
+
+
+# boxplot
+
+A box plot is a convenient way of depicting groups of data through theirfive-number summaries: the smallest observation (sample minimum), lowerquartile (Q1), median (Q2), upper quartile (Q3), and largest observation(sample maximum).
+
+
+```{r,eval=FALSE}
+
+highchart() %>% 
+  hc_add_series(
+    data = list_parse2(tibble(y = rnorm(100),name = sample(letters[1:5],100,replace = TRUE))),type = "boxplot"
+  ) %>% 
+  hc_add_theme(thm)
+
+ # %>% 
+ #  hchart("boxplot",hcaes(x = group,y = n, group = group))
+
+
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/box-plot/" target="_blank">box-plot</a></div>
+</div>
+
+``` 
+
+
+
+# bubble
+
+```{r}
+structure(list(x = c(95, 86.5, 80.8, 80.4, 80.3, 78.4, 74.2, 
+73.5, 71, 69.2, 68.6, 65.5, 65.4, 63.4, 64), y = c(95, 102.9, 
+91.5, 102.5, 86.1, 70.1, 68.5, 83.1, 93.2, 57.6, 20, 126.4, 50.8, 
+51.8, 82.9), z = c(13.8, 14.7, 15.8, 12, 11.8, 16.6, 14.5, 10, 
+24.7, 10.4, 16, 35.3, 28.5, 15.4, 31.3), name = c("BE", "DE", 
+"FI", "NL", "SE", "ES", "FR", "NO", "UK", "IT", "RU", "US", "HU", 
+"PT", "NZ"), country = c("Belgium", "Germany", "Finland", "Netherlands", 
+"Sweden", "Spain", "France", "Norway", "United Kingdom", "Italy", 
+"Russia", "United States", "Hungary", "Portugal", "New Zealand"
+)), class = c("tbl_df", "tbl", "data.frame"), row.names = c(NA, 
+-15L)) -> sugar_and_fat
+
+
+sugar_and_fat %>%
+  hchart(., "bubble", hcaes(x = x, y = y, z = z)) %>% 
+  hc_plotOptions(
+    series = list(
+      dataLabels = list(enabled = TRUE, format = "{point.name}")
+    )
+  ) %>% 
+  hc_tooltip(
+    headerFormat = "<table>",
+    pointFormat = paste(
+      '<tr><th colspan="2"><h3>{point.country}</h3></th></tr>',
+      "<tr><th>Fat intake:</th><td>{point.x}g</td></tr>",
+      "<tr><th>Sugar intake:</th><td>{point.y}g</td></tr>",
+      "<tr><th>Obesity (adults):</th><td>{point.z}%</td></tr>"
+    ),
+    footerFormat = "</table>",
+    useHTML = TRUE
+  ) %>% 
+  hc_xAxis(
+    plotLines = list(list(color = "black",dashStyle = "dot",value = 65,
+                          label = list(text = "Safe fat intake 65g/day",rotation = 0)))
+  ) %>%
+  hc_yAxis(
+    plotLines = list(list(color = "black",dashStyle = "dot",value = 50,
+                          label = list(text = "Safe sugar intake 50g/day",rotation = 0,align = "right")))
+  ) %>% 
+  hc_title(
+    text = "Sugar and fat intake per country"
+  ) %>% 
+  hc_subtitle(
+    text = "Source: Euromonitor and OECD"
+  ) %>% 
+  hc_add_theme(thm)
+
+
+
+
+
+```
+
+
+
+A bubble series is a three dimensional series type where each pointrenders an X, Y and Z value. Each points is drawn as a bubble where theposition along the X and Y axes mark the X and Y values, and the size ofthe bubble relates to the Z value.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/bubble/" target="_blank">bubble</a></div>
+</div>
+
+``` 
+
+
+
+# bullet
+
+A bullet graph is a variation of a bar graph. The bullet graph featuresa single measure, compares it to a target, and displays it in the contextof qualitative ranges of performance that could be set usingplotBands on yAxis.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/bullet-graph/" target="_blank">bullet-graph</a></div>
+</div>
+
+``` 
+
+
+
+# column
+
+Column series display one column per value along an X axis.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/column-basic/" target="_blank">column-basic</a></div>
+</div>
+
+``` 
+
+
+
+# columnpyramid
+
+Column pyramid series display one pyramid per value along an X axis.To display horizontal pyramids, set chart.inverted totrue.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/column-pyramid/" target="_blank">column-pyramid</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/columnpyramid-stacked/" target="_blank">columnpyramid-stacked</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/columnpyramid-inverted/" target="_blank">columnpyramid-inverted</a></div>
+</div>
+
+``` 
+
+
+
+# columnrange
+
+The column range is a cartesian series type with higher and lowerY values along an X axis. To display horizontal bars, setchart.inverted to true.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/columnrange/" target="_blank">columnrange</a></div>
+</div>
+
+``` 
+
+
+
+# cylinder
+
+A cylinder graph is a variation of a 3d column graph. The cylinder graphfeatures cylindrical points.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/cylinder/" target="_blank">cylinder</a></div>
+</div>
+
+``` 
+
+
+
+# dependencywheel
+
+A dependency wheel chart is a type of flow diagram, where all nodes arelaid out in a circle, and the flow between the are drawn as link bands.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/dependency-wheel/" target="_blank">dependency-wheel</a></div>
+</div>
+
+``` 
+
+
+
+# dumbbell
+
+The dumbbell series is a cartesian series with higher and lower valuesfor each point along an X axis, connected with a line between thevalues.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/dumbbell/" target="_blank">dumbbell</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-dumbbell/styled-mode-dumbbell/" target="_blank">styled-mode-dumbbell</a></div>
+</div>
+
+``` 
+
+
+
+# dumbbell
+
+Requires highcharts-more.js and modules/dumbbell.js.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/dumbbell/" target="_blank">dumbbell</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-dumbbell/styled-mode-dumbbell/" target="_blank">styled-mode-dumbbell</a></div>
+</div>
+
+``` 
+
+
+
+# errorbar
+
+Error bars are a graphical representation of the variability of data andare used on graphs to indicate the error, or uncertainty in a reportedmeasurement.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/error-bar/" target="_blank">error-bar</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-errorbar/on-scatter/" target="_blank">on-scatter</a></div>
+</div>
+
+``` 
+
+
+
+# funnel
+
+Funnel charts are a type of chart often used to visualize stages in asales project, where the top are the initial stages with the mostclients. It requires that the modules/funnel.js file is loaded.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/funnel/" target="_blank">funnel</a></div>
+</div>
+
+``` 
+
+
+
+# funnel3d
+
+A funnel3d is a 3d version of funnel series type. Funnel charts area type of chart often used to visualize stages in a sales project,where the top are the initial stages with the most clients.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/funnel3d/" target="_blank">funnel3d</a></div>
+</div>
+
+``` 
+
+
+
+# funnel3d
+
+It requires that the highcharts-3d.js, cylinder.js andfunnel3d.js module are loaded.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/funnel3d/" target="_blank">funnel3d</a></div>
+</div>
+
+``` 
+
+
+
+# gauge
+
+Gauges are circular plots displaying one or more values with a dialpointing to values along the perimeter.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/gauge-speedometer/" target="_blank">gauge-speedometer</a></div>
+</div>
+
+``` 
+
+
+
+# heatmap
+
+A heatmap is a graphical representation of data where the individualvalues contained in a matrix are represented as colors.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/heatmap/" target="_blank">heatmap</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/heatmap-canvas/" target="_blank">heatmap-canvas</a></div>
+</div>
+
+``` 
+
+
+
+# heatmap
+
+Requires modules/heatmap.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/heatmap/" target="_blank">heatmap</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/heatmap-canvas/" target="_blank">heatmap-canvas</a></div>
+</div>
+
+``` 
+
+
+
+# histogram
+
+A histogram is a column series which represents the distribution of thedata set in the base series. Histogram splits data into bins and showstheir frequencies.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/histogram/" target="_blank">histogram</a></div>
+</div>
+
+``` 
+
+
+
+# item
+
+An item chart is an infographic chart where a number of items are laidout in either a rectangular or circular pattern. It can be used tovisualize counts within a group, or for the circular pattern, typicallya parliament.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/parliament-chart" target="_blank">parliament-chart</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-item/rectangular" target="_blank">rectangular</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-item/symbols" target="_blank">symbols</a></div>
+</div>
+
+``` 
+
+
+
+# item
+
+The circular layout has much in common with a pie chart. Many of the itemseries options, like center, size and data label positioning, areinherited from the pie series and don't apply for rectangular layouts.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/parliament-chart" target="_blank">parliament-chart</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-item/rectangular" target="_blank">rectangular</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-item/symbols" target="_blank">symbols</a></div>
+</div>
+
+``` 
+
+
+
+# line
+
+A line series displays information as a series of data points connected bystraight line segments.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/line-basic/" target="_blank">line-basic</a></div>
+</div>
+
+``` 
+
+
+
+# lollipop
+
+The lollipop series is a carteseian series with a line anchored fromthe x axis and a dot at the end to mark the value.Requires highcharts-more.js, modules/dumbbell.js andmodules/lollipop.js.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/lollipop/" target="_blank">lollipop</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-dumbbell/styled-mode-dumbbell/" target="_blank">styled-mode-dumbbell</a></div>
+</div>
+
+``` 
+
+
+
+# networkgraph
+
+A networkgraph is a type of relationship chart, where connnections(links) attracts nodes (points) and other nodes repulse each other.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/network-graph/" target="_blank">network-graph</a></div>
+</div>
+
+``` 
+
+
+
+# organization
+
+An organization chart is a diagram that shows the structure of anorganization and the relationships and relative ranks of its parts andpositions.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/organization-chart/" target="_blank">organization-chart</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-organization/horizontal/" target="_blank">horizontal</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-organization/borderless" target="_blank">borderless</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-organization/center-layout" target="_blank">center-layout</a></div>
+</div>
+
+``` 
+
+
+
+# packedbubble
+
+A packed bubble series is a two dimensional series type, where each pointrenders a value in X, Y position. Each point is drawn as a bubblewhere the bubbles don't overlap with each other and the radiusof the bubble relates to the value.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/packed-bubble/" target="_blank">packed-bubble</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/packed-bubble-split/" target="_blank">packed-bubble-split</a></div>
+</div>
+
+``` 
+
+
+
+# pareto
+
+A pareto diagram is a type of chart that contains both bars and a linegraph, where individual values are represented in descending order bybars, and the cumulative total is represented by the line.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/pareto/" target="_blank">pareto</a></div>
+</div>
+
+``` 
+
+
+
+# pie
+
+A pie chart is a circular graphic which is divided into slices toillustrate numerical proportion.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/pie-basic/" target="_blank">pie-basic</a></div>
+</div>
+
+``` 
+
+
+
+# polygon
+
+A polygon series can be used to draw any freeform shape in the cartesiancoordinate system. A fill is applied with the color option, andstroke is applied through lineWidth and lineColor options.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/polygon/" target="_blank">polygon</a></div>
+</div>
+
+``` 
+
+
+
+# pyramid
+
+A pyramid series is a special type of funnel, without neck and reversedby default.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/pyramid/" target="_blank">pyramid</a></div>
+</div>
+
+``` 
+
+
+
+# pyramid3d
+
+A pyramid3d is a 3d version of pyramid series type. Pyramid charts area type of chart often used to visualize stages in a sales project,where the top are the initial stages with the most clients.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/pyramid3d/" target="_blank">pyramid3d</a></div>
+</div>
+
+``` 
+
+
+
+# sankey
+
+A sankey diagram is a type of flow diagram, in which the width of thelink between two nodes is shown proportionally to the flow quantity.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/sankey-diagram/" target="_blank">sankey-diagram</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/sankey-inverted/" target="_blank">sankey-inverted</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/sankey-outgoing" target="_blank">sankey-outgoing</a></div>
+</div>
+
+``` 
+
+
+
+# scatter
+
+A scatter plot uses cartesian coordinates to display values for twovariables for a set of data.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/scatter/" target="_blank">scatter</a></div>
+</div>
+
+``` 
+
+
+
+# scatter3d
+
+A 3D scatter plot uses x, y and z coordinates to display values for threevariables for a set of data.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/3d/scatter/" target="_blank">scatter</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/3d-scatter-draggable" target="_blank">3d-scatter-draggable</a></div>
+</div>
+
+``` 
+
+
+
+# solidgauge
+
+A solid gauge is a circular gauge where the value is indicated by a filledarc, and the color of the arc may variate with the value.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/gauge-solid/" target="_blank">gauge-solid</a></div>
+</div>
+
+``` 
+
+
+
+# spline
+
+A spline series is a special type of line series, where the segmentsbetween the data points are smoothed.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/spline-irregular-time/" target="_blank">spline-irregular-time</a></div>
+</div>
+
+``` 
+
+
+
+# streamgraph
+
+A streamgraph is a type of stacked area graph which is displaced around acentral axis, resulting in a flowing, organic shape.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/streamgraph/" target="_blank">streamgraph</a></div>
+</div>
+
+``` 
+
+
+
+# sunburst
+
+A Sunburst displays hierarchical data, where a level in the hierarchy isrepresented by a circle. The center represents the root node of the tree.The visualization bears a resemblance to both treemap and pie charts.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/sunburst" target="_blank">sunburst</a></div></div>
+</div>
+
+``` 
+
+
+
+# tilemap
+
+A tilemap series is a type of heatmap where the tile shapes areconfigurable.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/honeycomb-usa/" target="_blank">honeycomb-usa</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/maps/plotoptions/honeycomb-brazil/" target="_blank">honeycomb-brazil</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/maps/plotoptions/honeycomb-china/" target="_blank">honeycomb-china</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/maps/plotoptions/honeycomb-europe/" target="_blank">honeycomb-europe</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/maps/demo/circlemap-africa/" target="_blank">circlemap-africa</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/maps/demo/diamondmap" target="_blank">diamondmap</a></div>
+</div>
+
+``` 
+
+
+
+# timeline
+
+The timeline series presents given events along a drawn line.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-timeline/alternate-labels" target="_blank">alternate-labels</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-timeline/inverted" target="_blank">inverted</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-timeline/datetime-axis" target="_blank">datetime-axis</a></div>
+</div>
+
+``` 
+
+
+
+# treemap
+
+A treemap displays hierarchical data using nested rectangles. The datacan be laid out in varying ways depending on options.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/treemap-large-dataset/" target="_blank">treemap-large-dataset</a></div>
+</div>
+
+``` 
+
+
+
+# variablepie
+
+A variable pie series is a two dimensional series type, where each pointrenders an Y and Z value.  Each point is drawn as a pie slice where thesize (arc) of the slice relates to the Y value and the radius of pieslice relates to the Z value.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/variable-radius-pie/" target="_blank">variable-radius-pie</a></div>
+</div>
+
+``` 
+
+
+
+# variwide
+
+A variwide chart (related to marimekko chart) is a column chart with avariable width expressing a third dimension.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/variwide/" target="_blank">variwide</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-variwide/inverted/" target="_blank">inverted</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-variwide/datetime/" target="_blank">datetime</a></div>
+</div>
+
+``` 
+
+
+
+# vector
+
+A vector plot is a type of cartesian chart where each point has an X andY position, a length and a direction. Vectors are drawn as arrows.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/vector-plot/" target="_blank">vector-plot</a></div>
+</div>
+
+``` 
+
+
+
+# venn
+
+A Venn diagram displays all possible logical relations between acollection of different sets. The sets are represented by circles, andthe relation between the sets are displayed by the overlap or lack ofoverlap between them. The venn diagram is a special case of Eulerdiagrams, which can also be displayed by this series type.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/venn-diagram/" target="_blank">venn-diagram</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/euler-diagram/" target="_blank">euler-diagram</a></div>
+</div>
+
+``` 
+
+
+
+# waterfall
+
+A waterfall chart displays sequentially introduced positive or negativevalues in cumulative columns.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/waterfall/" target="_blank">waterfall</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/waterfall-inverted/" target="_blank">waterfall-inverted</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/waterfall-stacked/" target="_blank">waterfall-stacked</a></div>
+</div>
+
+``` 
+
+
+
+# windbarb
+
+Wind barbs are a convenient way to represent wind speed and direction inone graphical form. Wind direction is given by the stem direction, andwind speed by the number and shape of barbs.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/windbarb-series/" target="_blank">windbarb-series</a></div>
+</div>
+
+``` 
+
+
+
+# wordcloud
+
+A word cloud is a visualization of a set of words, where the size andplacement of a word is determined by how it is weighted.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/wordcloud" target="_blank">wordcloud</a></div>
+</div>
+
+``` 
+
+
+
+# xrange
+
+The X-range series displays ranges on the X axis, typically timeintervals with a start and end date.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/x-range/" target="_blank">x-range</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/css/x-range/" target="_blank">x-range</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/chart/inverted-xrange/" target="_blank">inverted-xrange</a></div>
+</div>
+
+``` 
+
+
+
+
+
+
+
+
+
+```{css}
+
+
+.Wrap {
+    max-width: calc(max(1180px,85%)) !important;
+}
+
+
+
+```
+
+
+```{js}
+
+
+function resizedw(){
+    $(".highchart, .highcharts-container, .highcharts-container > svg").each(function(){
+    
+      var chartHeight = $(this).height(), 
+          chartWidth = $(this).find("rect").width(), 
+          mainWidth = $(".Content").width(), 
+          newHeight = Math.round((chartHeight / chartWidth)*mainWidth);
+          
+      console.log(chartHeight,chartWidth,newHeight);
+       
+      $(this).css({"width":"100%","height": Math.round(((9 / 16) * mainWidth)) ,"max-width": "100%"});
+  })
+}
+
+var doit;
+window.onresize = function(){
+  clearTimeout(doit);
+  doit = setTimeout(resizedw, 1000);
+};
+
+window.dispatchEvent(new Event('resize'));
+
+
+
+
+
+```
+
+
+
+
+```{r,include = FALSE,eval = FALSE}
+
+minify_clip <- function(){
+  clipr::read_clip() %>% paste(collapse = "\n") -> txt_in
+
+txt_in %>%
+  stringr::str_replace_all(",[ \t]+ ", ",") %>%
+  stringr::str_replace_all(",\n", ",") %>%
+  stringr::str_replace_all(",[ \t]+ ", ",") %>%
+  stringr::str_replace_all(",\n", ",") %>%
+  styler::style_text() %>%
+  print() %>%
+  clipr::write_clip()
+}
+```
+
+
+
