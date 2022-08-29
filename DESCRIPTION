@@ -17,3 +17,5 @@ Depends:
     highcharter,
     R (>= 2.10)
 LazyData: true
+URL: https://github.com/zac-garland/highchart.extensions
+BugReports: https://github.com/zac-garland/highchart.extensions/issues
