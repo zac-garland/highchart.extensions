@@ -90,6 +90,80 @@ hcExamples %>%
 
 ```
 
+# messing around with grid
+
+
+
+```{r}
+create_yaxis_horizontal <- function (naxis = 2, heights = 1, sep = 0.01, offset = 0, turnopposite = TRUE, 
+                                     ...) 
+{
+  pcnt <- function(x) paste0(x * 100, "%")
+  heights <- rep(heights, length = naxis)
+  heights <- (heights/sum(heights)) %>% map(function(x) c(x, 
+                                                          sep)) %>% unlist() %>% head(-1) %>% {
+                                                            ./sum(.)
+                                                          } %>% round(5)
+  tops <- cumsum(c(0, head(heights, -1)))
+  tops <- pcnt(tops)
+  heights <- pcnt(heights)
+  dfaxis <- tibble(width = heights, left = tops, offset = offset)
+  dfaxis <- dfaxis %>% dplyr::filter(seq_len(nrow(dfaxis))%%2 != 
+                                       0)
+  if (turnopposite) {
+    ops <- rep_len(c(FALSE, TRUE), length.out = nrow(dfaxis))
+    dfaxis <- dfaxis %>% mutate(opposite = ops)
+  }
+  dfaxis <- bind_cols(dfaxis, tibble(nid = seq(naxis), ...))
+  axles <- list_parse(dfaxis)
+  class(axles) <- "hc_axis_list"
+  axles
+}
+
+```
+
+```{r}
+highchart() %>%
+  hc_xAxis_multiples(structure(list(list(width = "50%"),
+                          list(opposite = FALSE,width = "45%",left = "55%")
+  ) ,class = "hc_axis_list")) %>% 
+  hc_yAxis_multiples(structure(list(list(width = "32.68%",height = "100%"),
+                                    list(opposite = TRUE,width = "65.36%",left = "32.68%",height = "49.505%",top = "0%"),
+                                    list(opposite = TRUE,width = "65.36%",left = "32.68%",height = "49.505%",top = "50.495%")
+  ) ,class = "hc_axis_list")) %>%
+  hc_add_series(data = c(1, 3, 2),xAxis = 0,yAxis = 0) %>%
+  hc_add_series(data = c(20, 40, 10), type = "area", xAxis = 1,yAxis = 1) %>%
+  hc_add_series(data = c(200, 400, 500), xAxis = 1,yAxis = 2) %>%
+  hc_add_series(data = c(500, 300, 400), type = "areaspline", xAxis = 1,yAxis = 2)
+
+
+highchart() %>%
+  hc_xAxis_multiples(create_yaxis_horizontal(naxis = 3,turnopposite = FALSE)) %>% 
+  hc_yAxis_multiples(create_yaxis_horizontal(naxis = 3, lineWidth = 2, title = list(text = NULL),turnopposite = FALSE,opposite = c(FALSE,TRUE,TRUE))) %>%
+  hc_add_series(data = c(1, 3, 2),xAxis = 0,yAxis = 0) %>%
+  hc_add_series(data = c(20, 40, 10), type = "area", xAxis = 1,yAxis = 1) %>%
+  hc_add_series(data = c(200, 400, 500), xAxis = 2,yAxis = 2) %>%
+  hc_add_series(data = c(500, 300, 400), type = "areaspline", xAxis = 2,yAxis = 2)
+
+```
+
+
+# legend and last value
+
+```{r}
+economics_long %>%
+  mutate(date = datetime_to_timestamp(date)) %>%
+  highcharter::hchart("area", hcaes(date, value01, group = variable)) %>%
+  highcharter::hc_xAxis(type = "datetime") %>%
+  hc_plotOptions(area = list(stacking = "normal")) %>%
+  hc_legend(layout = "proximate", align = "right", labelFormatter = JS("function () {
+           ydat = this.yData;
+            return this.name + ' ' + ydat[ydat.length-1].toFixed(2); 
+        }"))
+```
+
+
+
 # Charts
 
 
@@ -131,9 +205,10 @@ thm <- hc_theme_merge(
   thm
 )
 
+options(highcharter.theme = thm)
 
-highcharter::highcharts_demo() %>%
-  hc_add_theme(thm)
+
+highcharter::highcharts_demo()
 ```
 
 
@@ -147,8 +222,7 @@ data(economics_long, package = "ggplot2")
 
 economics_long2 <- dplyr::filter(economics_long, variable %in% c("pop", "uempmed", "unemploy"))
 
-hchart(economics_long2, "line", hcaes(x = date, y = value01, group = variable)) %>% 
-  hc_add_theme(thm)
+hchart(economics_long2, "line", hcaes(x = date, y = value01, group = variable))
 
 ```
 
@@ -170,8 +244,7 @@ df <- tibble(
 
 hchart(df, "coloredarea", hcaes(x, y, segmentColor = col)) %>% 
    hc_add_series(df, "coloredline", hcaes(x, y2 , segmentColor = col)) %>% 
-   hc_add_dependency("plugins/multicolor_series.js")  %>%
-  hc_add_theme(thm)
+   hc_add_dependency("plugins/multicolor_series.js")
 
 
 ```
@@ -195,8 +268,7 @@ hc <- hchart(
   hcaes(x = speed, y = dist),
   name = "Speed and Stopping Distances of Cars",
   showInLegend = TRUE
-  ) %>% 
-  hc_add_theme(thm)
+  )
 
 
 qtint <- qt(0.975, predict(modlss, se = TRUE)$df)
@@ -280,8 +352,7 @@ highchart() %>%
   ) %>%
   hc_size(
     height = 600
-  ) %>% 
-  hc_add_theme(thm)
+  )
 
 ```
 
@@ -298,20 +369,49 @@ tibble(from = sample(letters),to = sample(letters[1:10],26,replace = TRUE),weigh
   split(.$rowid) %>% 
   map(~{
     
-  })
+    tibble(from = .x$from, to = .x$to, weight = .x$weight)
+  }) %>% 
   highcharter::list_parse2() -> arc_data
 
-arc_data
+tibble(from = sample(letters),to = sample(letters[1:10],26,replace = TRUE),weight = sample(1:5,26,replace = TRUE)) -> arc_data 
+arc_data %>% 
+  rowid_to_column() %>% 
+  split(.$rowid) %>% 
+  map(~{
+    list(.x$from,.x$to,.x$weight)
+  }) -> arc_data
 
-highchart(type = "chart") %>% 
+# arc_data %>% 
+#   list_parse() %>% jsonlite::toJSON(pretty = TRUE)
+
+
+
+hchart(arc_data,"arcdiagram",hcaes(from = from,to = to,weight = weight)) %>% 
+  hc_add_dependency("modules/arc-diagram.js")
+
+
+highchart() %>%
   hc_add_series(
-    list(
-      keys = c("from","to","weight"),
+# series = list(
+      data = unname(arc_data) %>% jsonlite::toJSON(auto_unbox = TRUE),
+      keys = c("from", "to", "weight"),
       type = "arcdiagram",
-      offset = "65%",data = arc_data
-    )
-  ) %>% 
-  hc_add_theme(thm)
+      name = "Train connections",
+      linkWeight = 1,
+      centeredLinks = TRUE,
+      dataLabels = list(
+        rotation = 90,
+        y = 30,
+        align = "left",
+        color = "black"
+      ),
+      offset = "65%"
+
+    # )
+  ) %>%
+  hc_add_dependency("modules/arc-diagram.js")
+# hc_add_dep
+
 
 ```
 
@@ -332,8 +432,7 @@ The area series type.
 
 ```{r}
 economics_long %>% 
-  hchart("area",hcaes(date,value01,group = variable)) %>% 
-  hc_add_theme(thm)
+  hchart("area",hcaes(date,value01,group = variable))
 
 
 
@@ -364,8 +463,7 @@ highchart() %>%
   ) %>% 
   hc_title(
     text = "Temperature variation by day"
-  ) %>% 
-  hc_add_theme(thm)
+  )
   
 ```
 
@@ -386,15 +484,8 @@ highchart() %>%
 
 ## areaspline
 
+
 The area spline series is an area series where the graph between thepoints is smoothed into a spline.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/areaspline/" target="_blank">areaspline</a></div>
-</div>
-
-``` 
 
 ```{r}
 moose_and_deer <- tibble(
@@ -418,13 +509,23 @@ hchart(moose_and_deer,"areaspline",hcaes(x = year,y = value,group = key )) %>%
     labels = list(style = list(color = "var(--page-background)"))
   ) %>% 
   hc_title(text = "Moose and deer hunting in Norway 2000-2021") %>%
-  hc_subtitle(text="Source:SSB") %>% 
-  hc_add_theme(thm)
+  hc_subtitle(text="Source:SSB")
 
 
 
 
 ```
+
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/areaspline/" target="_blank">areaspline</a></div>
+</div>
+
+``` 
+
 
 
 ## bar
@@ -436,8 +537,7 @@ palmerpenguins::penguins %>%
   group_by(species) %>%
   summarize(flipper_length = mean(flipper_length_mm, na.rm = TRUE)) %>% 
   hchart("bar",hcaes(species,flipper_length,color = I(viridis::viridis(3)))) %>%
-  hc_title(text = "Average Flipper Length by Penguin Species") %>% 
-  hc_add_theme(thm)
+  hc_title(text = "Average Flipper Length by Penguin Species") 
 
 
 ```
@@ -472,14 +572,31 @@ A bell curve is an areaspline series which represents the probabilitydensity fun
 
 A box plot is a convenient way of depicting groups of data through theirfive-number summaries: the smallest observation (sample minimum), lowerquartile (Q1), median (Q2), upper quartile (Q3), and largest observation(sample maximum).
 
+```{r}
+
+hchart()
+
+```
+
 
 ```{r,eval=FALSE}
 
-highchart() %>% 
-  hc_add_series(
-    data = list_parse2(tibble(y = rnorm(100),name = sample(letters[1:5],100,replace = TRUE))),type = "boxplot"
-  ) %>% 
-  hc_add_theme(thm)
+c(3.5, 3, 3.2, 3.1, 3.6, 3.9, 3.4, 3.4, 2.9, 3.1, 3.7, 3.4, 3, 3, 4,
+    4.4, 3.9, 3.5, 3.8, 3.8, 3.4, 3.7, 3.6, 3.3, 3.4, 3, 3.4, 3.5, 3.4, 3.2,
+    3.1, 3.4, 4.1, 4.2, 3.1, 3.2, 3.5, 3.6, 3, 3.4, 3.5, 2.3, 3.2, 3.5, 3.8, 3,
+    3.8, 3.2, 3.7, 3.3, 3.2, 3.2, 3.1, 2.3, 2.8, 2.8, 3.3, 2.4, 2.9, 2.7, 2, 3,
+    2.2, 2.9, 2.9, 3.1, 3, 2.7, 2.2, 2.5, 3.2, 2.8, 2.5, 2.8, 2.9, 3, 2.8, 3,
+    2.9, 2.6, 2.4, 2.4, 2.7, 2.7, 3, 3.4, 3.1, 2.3, 3, 2.5, 2.6, 3, 2.6, 2.3,
+    2.7, 3, 2.9, 2.9, 2.5, 2.8, 3.3, 2.7, 3, 2.9, 3, 3, 2.5, 2.9, 2.5, 3.6,
+    3.2, 2.7, 3, 2.5, 2.8, 3.2, 3, 3.8, 2.6, 2.2, 3.2, 2.8, 2.8, 2.7, 3.3, 3.2,
+    2.8, 3, 2.8, 3, 2.8, 3.8, 2.8, 2.8, 2.6, 3, 3.4, 3.1, 3, 3.1, 3.1, 3.1, 2.7,
+    3.2, 3.3, 3, 2.5, 3, 3.4, 3) %>% 
+  {
+    dat <- .
+    highchart() %>% 
+      hc_add_series(data = dat,type = "bellcurve")%>% 
+     hc_add_dependency("modules/histogram-bellcurve.js")
+  } 
 
  ## %>% 
  ##  hchart("boxplot",hcaes(x = group,y = n, group = group))
@@ -545,8 +662,7 @@ sugar_and_fat %>%
   ) %>% 
   hc_subtitle(
     text = "Source: Euromonitor and OECD"
-  ) %>% 
-  hc_add_theme(thm)
+  )
 
 
 
@@ -569,6 +685,41 @@ A bubble series is a three dimensional series type where each pointrenders an X,
 
 
 ## bullet
+
+```{r}
+df <- data.frame(
+  y = sample(5:10),
+  target = sample(5:10),
+  x = LETTERS[1:6]
+  )
+
+hchart(df, "bullet", hcaes(x = x, y = y, target = target), color = "black") %>%
+  hc_chart(inverted = TRUE) %>%
+  hc_yAxis(
+    min = 0,
+    max = 10,
+    gridLineWidth = 0,
+    plotBands = list(
+      list(from = 0, to = 7, color = "#666"),
+      list(from = 7, to = 9, color = "#999"),
+      list(from = 9, to = 10, color = "#bbb")
+    )
+  ) %>%
+  hc_xAxis(
+    gridLineWidth = 15,
+    gridLineColor = "white"
+  ) %>% 
+  hc_plotOptions(
+    series = list(
+      pointPadding = 0.25,
+      pointWidth = 15,
+      borderWidth = 0,
+      targetOptions = list(width = '200%')
+      )
+    )
+```
+
+
 
 A bullet graph is a variation of a bar graph. The bullet graph featuresa single measure, compares it to a target, and displays it in the contextof qualitative ranges of performance that could be set usingplotBands on yAxis.
 
@@ -990,6 +1141,46 @@ A pareto diagram is a type of chart that contains both bars and a linegraph, whe
 
 ## pie
 
+```{r}
+library(scales)
+
+diamond_data <- count(diamonds, clarity)
+diamond_data <- mutate(diamond_data, porcentaje = percent(n/sum(n)))
+
+
+hchart(
+  diamond_data, "pie", hcaes(name = clarity, y = n),
+  name = "Corte",
+  innerSize = "80%",
+  dataLabels = list(format = "{point.name}<br>({point.porcentaje})")
+  ) -> hc
+hc
+
+hc%>% 
+  hc_tooltip(
+    useHTML = TRUE,
+    style = list(fontSize = "30px"),
+    headerFormat = "",
+    pointFormat = "<div style='text-align: center;'> <b>{point.name}</b><br>{point.y} <br>{point.porcentaje} </div>",
+    positioner = JS(
+      "function () {
+      
+        /* one of the most important parts! */
+        xp =  this.chart.chartWidth/2 - this.label.width/2
+        yp =  this.chart.chartHeight/2 - this.label.height/2
+      
+        return { x: xp, y: yp };
+      
+      }"),
+    shadow = FALSE,
+    borderWidth = 0,
+    backgroundColor = "transparent",
+    hideDelay = 1000
+    )
+
+```
+
+
 A pie chart is a circular graphic which is divided into slices toillustrate numerical proportion.
 
 ```{=html}
@@ -1245,7 +1436,6 @@ hchart(tile_map_usa, "tilemap",dataLabels = list(enabled = TRUE, format = "{poin
   hc_subtitle(
     text = "Source: Wikipedia"
   ) %>% 
-  hc_add_theme(thm) %>% 
   hc_size(width = 600,height = 600)
 
 ```
