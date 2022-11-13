@@ -1,0 +1,9 @@
+mtcars
+mtcars.cyl
+console.log(mtcars.cyl)
+console.table(mtcars)
+console.log(mtcars)
+JSON.parse(mtcars)
+test
+JSON.stringify(test)
+ctx$eval("console.r.assign(JSON.stringify(series))","test")

@@ -21,74 +21,8 @@ library(htmltools)
 ```
 
 
-```{r,eval = FALSE}
-library(highcharter)
-library(tidyverse)
+# Disclaimer many of these are pulled from Joshua Kunst's blog, documentation, and issue responses.
 
-hcExamples
-
-hcExamples %>% 
-  split(.$text) %>% 
-  map(~{
-    
- unique(.x$example) %>% 
-      map(~{tags$a(basename(.x),href = .x,target = '_blank')}) %>% 
-      div() %>% as.character() -> examples_out
-    
-    glue::glue(
-      "## {unique(.x$text)}
-      
-      {unique(.x$desc)}
-      
-      ```{{=html}}
-      
-      {examples_out}
-      
-      ```
-      
-            
-            "
-    ) %>% 
-      str_trim()
-    
-  }) %>% 
-  
-  unlist() %>% 
-  paste(collaspe = "\n\n\n") %>%
-  clipr::write_clip()
-  ## writeLines(sep = "\n\n\n")
-  
-  map(~{
-    div(
-      h1(unique(.x$text))
-    )
-  }) %>% 
-  div()
-  
-
-  ## ## map(~{
-  ##   
-  ##   ## header <- unique(.x$text)
-  ##   ## descrip <- unique(.x$desc)
-  ##   ## examples <- unique(.x$example)
-  ##   ## links <- unique(.x$example)
-  ##   ## list_unique <- 
-  ##     .x %>% lapply(unique)
-  ##   
-  ##   
-  ##   
-  ##   
-  ##   ## div(
-  ##   ##   h1(list_unique$text),
-  ##   ##   p(list_unique$text),
-  ##   ##   lapply(links_unique(tags$a(href  = .)
-  ##   ## )
-  ##   ## 
-  ##   ## .x %>% 
-  ##   ##   div(h1(unique(.x$text)),p(unique(.x$desc)),unique(.x$example) %>% map(~{tags$a(href = .x,target = "blank_")}))
-  ## })
-
-```
 
 # messing around with grid
 
@@ -296,9 +230,6 @@ hc %>%
 
 ```
 
-```{r}
-
-```
 
 
 ```{r}
@@ -764,6 +695,8 @@ Column pyramid series display one pyramid per value along an X axis.To display h
 
 
 ## columnrange
+
+
 
 The column range is a cartesian series type with higher and lowerY values along an X axis. To display horizontal bars, setchart.inverted to true.
 
@@ -1623,9 +1556,464 @@ The X-range series displays ranges on the X axis, typically timeintervals with a
 
 
 
+## extra
 
 
 
+### simulating arima
+
+```{r}
+
+library(highcharter)
+library(stringr)
+sim_ar_hc <- function(ar = c(0.3, 0.2), time = 1){
+  
+   # the first values of the model
+  ts <- as.vector(arima.sim(model = list(ar = ar), n = 10))
+  ts <- round(ts, 3)
+  ts
+  
+load_fn <- "function () {{
+	dot = (a, b) => a.map((x, i) => a[i] * b[i]).reduce((m, n) => m + n);
+  function randn_bm() {{
+  	var u = 0, v = 0;
+    while(u === 0) u = Math.random(); //Converting [0,1) to (0,1)
+    while(v === 0) v = Math.random();
+    return Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
+   }}
+  
+	var dat = [{ data }];
+  var ar = [{ ar }];
+  dat = dat.slice(-ar.length);
+  
+  // set up the updating of the chart each second
+  var series = this.series[0];
+  
+  setInterval(function () {{
+      
+      console.log(dat);
+      var new_value = dot(dat, ar) + randn_bm();
+      new_value = Math.round(1000 * new_value)/1000
+      console.log(new_value)
+      dat.shift(); 
+      dat.push(new_value);
+      series.addPoint([new_value]);  
+      
+      //if (series.data.length < 500) {{
+      //  series.addPoint([new_value], true, false);
+      //}} else {{
+      //  series.addPoint([new_value], true, true);
+      //}}
+      
+  }}, { time });
+  
+}}"
+  
+  load_fn_glued <- str_glue(
+    load_fn,
+    data = str_c(ts, collapse = ","),
+    ar = str_c(ar, collapse = ","),
+    time = time * 1000
+  )
+  
+  tick_post_fn <- "function(min,max){        
+    var data = this.chart.yAxis[0].series[0].processedYData;
+    //last point
+    return [Math.round(1000 * data[data.length-1])/1000]; 
+  }"
+  
+  rm_poinst_fn <- "function () {
+    for (var i = 1; i <= 500; i++) {
+      if (this.series[0].data.length) {
+        this.series[0].data[0].remove();
+      }
+    }
+  }"
+    
+  formula <- purrr::map2(ar, seq_along(ar), function(par, t){
+    
+    if(par > 0 & t > 1) {
+      par <- str_c("+ ", par)
+    }
+    
+    htmltools::tagList(par, "×", "X", tags$sub(stringr::str_glue("t - { i }", i = t)))
+    
+  }) 
+  
+  formula <- purrr::reduce(formula, htmltools::tagList)
+  
+  formula <- str_c("X", tags$sub("t") %>% as.character(), " = ",formula %>% as.character(), " + &epsilon;",  tags$sub("t") %>% as.character())
+  
+  hc <- highchart() %>% 
+    hc_add_series(data = ts, name = "Process") %>% 
+    hc_chart(
+      events = list(load = JS(load_fn_glued)), 
+      animation = list(duration = time*1000/2)
+      ) %>%
+    hc_title(text = "Autoregressive process") %>%
+    hc_subtitle(text = formula, useHTML = TRUE) %>%
+    hc_plotOptions(series = list(marker = list(enabled = FALSE))) %>%
+    hc_tooltip(valueDecimals = 3) %>%
+    hc_xAxis(width = "95%") %>%
+    hc_exporting(
+      enabled = TRUE,
+      buttons = list(
+        list(
+          text =  "Remove last 500 values",
+          onclick = JS(rm_poinst_fn),
+          theme = list(stroke = 'silver')
+          )
+        )
+      ) %>%
+    hc_yAxis_multiples(
+      # default axis
+      list(
+        title = list(text = ""),
+        plotLines = list(
+          list(value = 0, width = 2, color = "#AAA", zIndex = 1)
+          )
+        ),
+      # opposite axis
+      list(
+        title = list(text = ""),
+        linkedTo = 0,
+        opposite = TRUE,
+        gridLineWidth = 0,
+        tickPositioner = JS(tick_post_fn)
+      )
+    ) %>%
+    hc_navigator(
+      enabled = TRUE,
+      series = list(type = "line"),
+      xAxis = list(labels = list(enabled = FALSE), width = "95%")
+    )
+  
+  hc
+  
+}
+
+
+
+sim_ar_hc()
+
+```
+
+### code src
+
+```{r,eval = FALSE}
+library(highcharter)
+library(tidyverse)
+
+hcExamples
+
+hcExamples %>% 
+  split(.$text) %>% 
+  map(~{
+    
+ unique(.x$example) %>% 
+      map(~{tags$a(basename(.x),href = .x,target = '_blank')}) %>% 
+      div() %>% as.character() -> examples_out
+    
+    glue::glue(
+      "## {unique(.x$text)}
+      
+      {unique(.x$desc)}
+      
+      ```{{=html}}
+      
+      {examples_out}
+      
+      ```
+      
+            
+            "
+    ) %>% 
+      str_trim()
+    
+  }) %>% 
+  
+  unlist() %>% 
+  paste(collaspe = "\n\n\n") %>%
+  clipr::write_clip()
+  
+  map(~{
+    div(
+      h1(unique(.x$text))
+    )
+  }) %>% 
+  div()
+  
+
+  map(~{
+
+  header <- unique(.x$text)
+  descrip <- unique(.x$desc)
+  examples <- unique(.x$example)
+  links <- unique(.x$example)
+  list_unique <-
+      .x %>% lapply(unique)
+
+
+
+
+    div(
+      h1(list_unique$text),
+      p(list_unique$text),
+      lapply(links_unique(tags$a(href  = .)
+    )
+
+    .x %>%
+      div(h1(unique(.x$text)),p(unique(.x$desc)),unique(.x$example) %>% map(~{tags$a(href = .x,target = "blank_")}))
+  })
+
+```
+
+### js files
+
+```{r,eval=FALSE}
+path.expand("~/html_projects/highcharts-master/samples/highcharts/demo/") -> base_dir
+
+list.files(base_dir) %>% 
+  map_dfr(~{
+    file.path(base_dir,.x) %>% 
+      list.files() %>% 
+      tibble(files = .) %>% 
+      mutate(group = .x)
+  }) %>% 
+  ungroup() %>% 
+  filter(tools::file_ext(files)=="js") %>% 
+  rowwise() %>% 
+  mutate(
+    lines = map2(group,files,~{
+      read_lines(file.path(base_dir,.x,.y)) %>%
+      paste(collapse = "\n") %>% 
+      prettifyAddins::prettify_V8(language = "javascript") %>% 
+        str_split("\n") %>% unlist() %>% tibble(code_line = .)
+      })
+  ) -> js_files
+
+
+
+readr::read_lines("inst/highcharts.Rmd") %>%
+  tibble(line = .) %>%
+  filter(str_detect(line, "href=")) %>%
+  mutate(group = stringr::str_extract(line, "demo/[a-zA-Z-]+/")) %>%
+  select(group) %>% 
+  mutate(group = stringr::str_remove_all(group,"demo\\/|\\/")) %>% 
+  inner_join(js_files) %>%
+  unique() %>% 
+  split(.$group) -> js_examples
+
+
+
+
+
+c("title","series",  "yAxis",  "chart", "xAxis", 
+"tooltip",  "plotOptions", "subtitle", "name", "legend", 
+"accessibility",  "colors", "credits", "responsive", 
+"exporting", "colorAxis", "id", "marker",
+"annotations", "boost", "caption","data"
+) -> group_keys
+
+js_examples %>%
+  map_dfr(~ {
+    unnest(.x, lines) %>%
+      mutate(group_level = (stringr::str_length(code_line) - stringr::str_length(code_line %>% stringr::str_trim())) %>% dense_rank())
+  }) %>%
+  filter(group_level != 1) %>%
+  # filter(group_level == 2) %>% 
+  rowwise() %>%
+  mutate(code_group = stringr::str_split(code_line, ":") %>% unlist() %>% .[[1]] %>% str_trim()) %>%
+  mutate(code_group = case_when(code_group %in% group_keys & group_level == 2 ~ code_group,TRUE ~ NA_character_)) %>% 
+  ungroup() %>% 
+  fill(code_group) %>%
+  mutate(code_line = case_when(
+    group_level == 2 ~ str_replace(code_line,paste0(code_group,":"),glue::glue("{code_group} =")), TRUE ~ code_line
+  )) -> group_code 
+ 
+
+ctx <- V8::v8()
+
+group_code %>%
+  filter(group == "bubble") %>%
+  split(.$group) %>%
+  map(~ {
+    .x %>%
+      split(.$code_group) %>%
+      imap(~ {
+            .x <- .x %>%
+              mutate(code_line = case_when(
+                row_number() == max(row_number()) & str_sub(code_line, -1L, -1L) == "," ~ str_sub(code_line, 1, -2L), TRUE ~ code_line
+              )) %>%
+              print()
+
+            ctx$eval(JS(pull(.x, code_line) %>% paste(collapse = "")))
+            ctx$eval(glue::glue("console.r.assign('test2',JSON.stringify({unique(.x$code_group)}))"))
+
+            jsonlite::fromJSON(test2)
+              
+          
+      }) %>% 
+      imap(~{
+        glue::glue("hc_{.y}({capture.output(dput(.x)) %>% paste(collapse = '')})")
+      })
+  })
+
+
+
+
+
+
+
+```
+
+
+### JS example print
+
+```{r,eval = FALSE}
+
+js_examples %>% 
+  map(~{
+    print(.x)
+    code_lines <- pull(.x,lines) %>% unlist() %>% as_tibble()
+    code_chunk <- paste(collapse = "\n",code_lines$value)
+    print(length(code_chunk))
+    
+    htmltools::tags$div(
+      htmltools::tags$h1(.x$group),
+        htmltools::tags$pre(code_chunk)
+    )
+  }) %>% 
+  shiny::fluidPage() %>% 
+  htmltools::html_print()
+
+```
+
+
+```{r,eval = FALSE}
+library(highcharter)
+library(tidyverse)
+
+hcExamples
+
+hcExamples %>% 
+  split(.$text) %>% 
+  map(~{
+    
+ unique(.x$example) %>% 
+      map(~{tags$a(basename(.x),href = .x,target = '_blank')}) %>% 
+      div() %>% as.character() -> examples_out
+    
+    glue::glue(
+      "## {unique(.x$text)}
+      
+      {unique(.x$desc)}
+      
+      ```{{=html}}
+      
+      {examples_out}
+      
+      ```
+      
+            
+            "
+    ) %>% 
+      str_trim()
+    
+  }) %>% 
+  
+  unlist() %>% 
+  paste(collaspe = "\n\n\n") %>%
+  clipr::write_clip()
+  
+  map(~{
+    div(
+      h1(unique(.x$text))
+    )
+  }) %>% 
+  div()
+  
+
+  map(~{
+
+  header <- unique(.x$text)
+  descrip <- unique(.x$desc)
+  examples <- unique(.x$example)
+  links <- unique(.x$example)
+  list_unique <-
+      .x %>% lapply(unique)
+
+    div(
+      h1(list_unique$text),
+      p(list_unique$text),
+      lapply(links_unique(tags$a(href  = .)
+    )
+
+    .x %>%
+      div(h1(unique(.x$text)),p(unique(.x$desc)),unique(.x$example) %>% map(~{tags$a(href = .x,target = "blank_")}))
+  })
+
+```
+
+```{r,eval=FALSE}
+path.expand("~/html_projects/highcharts-master/samples/highcharts/demo/") -> base_dir
+
+list.files(base_dir) %>% 
+  map_dfr(~{
+    file.path(base_dir,.x) %>% 
+      list.files() %>% 
+      tibble(files = .) %>% 
+      mutate(group = .x)
+  }) %>% 
+  rowwise() %>% 
+  mutate(
+    lines = map2(group,files,~read_lines(file.path(base_dir,.x,.y)) %>% tibble(code_line = .))
+  ) %>% 
+  ungroup() %>% 
+  filter(tools::file_ext(files)=="js") -> js_files
+
+
+readr::read_lines("inst/highcharts.Rmd") %>% 
+  tibble(line = .) %>% 
+  filter(str_detect(line,"##"))
+
+readr::read_lines("inst/highcharts.Rmd") %>%
+  tibble(line = .) %>%
+  filter(str_detect(line, "href=")) %>%
+  mutate(group = stringr::str_extract(line, "demo/[a-zA-Z-]+/")) %>%
+  select(group) %>%
+  print(n = nrow(.))
+```
+
+
+
+### helper funs
+
+
+
+```{r,include = FALSE,eval = FALSE}
+
+minify_clip <- function(){
+  clipr::read_clip() %>% paste(collapse = "\n") -> txt_in
+
+txt_in %>%
+  stringr::str_replace_all(",[ \t]+ ", ",") %>%
+  stringr::str_replace_all(",\n", ",") %>%
+  stringr::str_replace_all(",[ \t]+ ", ",") %>%
+  # stringr::str_replace_all(",\n", ",") %>%
+  cat() %>%
+  styler::style_text() %>%
+  clipr::write_clip()
+}
+
+parse_js <- function(){
+  clipr::read_clip() %>% str_replace_all("\\{","list(") %>% str_replace_all("\\}",")") %>% stringr::str_replace_all(":","=") %>% stringr::str_replace_all("\\[","bind_rows(") %>% stringr::str_replace_all("\\]",")") %>% paste(collapse = "\n") %>% styler::style_text()
+}
+
+```
+
+
+### page
 
 
 ```{css}
@@ -1668,30 +2056,5 @@ window.dispatchEvent(new Event('resize'));
 
 
 ```
-
-
-
-
-```{r,include = FALSE,eval = FALSE}
-
-minify_clip <- function(){
-  clipr::read_clip() %>% paste(collapse = "\n") -> txt_in
-
-txt_in %>%
-  stringr::str_replace_all(",[ \t]+ ", ",") %>%
-  stringr::str_replace_all(",\n", ",") %>%
-  stringr::str_replace_all(",[ \t]+ ", ",") %>%
-  stringr::str_replace_all(",\n", ",") %>%
-  styler::style_text() %>%
-  print() %>%
-  clipr::write_clip()
-}
-
-parse_js <- function(){
-  clipr::read_clip() %>% str_replace_all("\\{","c(") %>% str_replace_all("\\}",")") %>% stringr::str_replace_all(":","=") %>% stringr::str_replace_all("\\[","bind_rows(") %>% stringr::str_replace_all("\\]",")") %>% paste(collapse = "\n") %>% styler::style_text()
-}
-
-```
-
 
 
