@@ -21,7 +21,55 @@ library(htmltools)
 ```
 
 
-# Disclaimer many of these are pulled from Joshua Kunst's blog, documentation, and issue responses.
+This page is heavily influenced by Joshua Kunst's blog, documentation, and issue responses.
+
+
+## Theme
+
+```{r}
+thm <- hc_theme(
+      colors = c("#7cb5ec", "#434348", "#90ed7d", "#f7a35c", "#8085e9", "#f15c80", 
+"#e4d354", "#2b908f", "#f45b5b", "#91e8e1"), chart = list(
+      backgroundColor = "var(--page-background)"
+    ), xAxis = list(
+      labels = list(style = list(color = "var(--text-color)")),
+      gridLineDashStyle = "Dash",
+      gridLineWidth = 1, gridLineColor = "var(--code-block-background)", lineColor = "var(--text-color)",
+      minorGridLineColor = "var(--text-color)", tickColor = "var(--text-color)", tickWidth = 1,
+      title = list(style = list(color = "var(--text-color)"))
+    ), yAxis = list(
+      labels = list(style = list(color = "var(--text-color)")),
+      gridLineDashStyle = "Dash",
+      gridLineWidth = 1, gridLineColor = "var(--code-block-background)", lineColor = "var(--text-color)",
+      minorGridLineColor = "var(--text-color)", tickColor = "var(--text-color)", tickWidth = 1,
+      title = list(style = list(color = "var(--text-color)"))    
+      ), legendBackgroundColor = "var(--page-background)",
+    background2 = "var(--page-background)", dataLabelsColor = "var(--text-color)", textColor = "var(--text-color)",
+    contrastTextColor = "var(--text-color)", maskColor = "rgba(255,255,255,0.3)",
+    title = list(style = list(color = "var(--text-color)")), subtitle = list(
+      style = list(color = "var(--text-color)")
+    ), legend = list(
+      itemStyle = list(
+        color = "var(--text-color)"
+      ), itemHoverStyle = list(color = "var(--text-color)"),
+      itemHiddenStyle = list(color = "var(--text-color)")
+    )
+
+)
+
+thm <- hc_theme_merge(
+  hc_theme_darkunica(),
+  thm
+)
+
+options(highcharter.theme = thm)
+
+
+highcharter::highcharts_demo()
+```
+
+
+
 
 
 # messing around with grid
@@ -99,52 +147,6 @@ economics_long %>%
 
 
 # Charts
-
-
-## Theme
-
-```{r}
-thm <- hc_theme(
-      colors = c("#7cb5ec", "#434348", "#90ed7d", "#f7a35c", "#8085e9", "#f15c80", 
-"#e4d354", "#2b908f", "#f45b5b", "#91e8e1"), chart = list(
-      backgroundColor = "var(--page-background)"
-    ), xAxis = list(
-      labels = list(style = list(color = "var(--text-color)")),
-      gridLineDashStyle = "Dash",
-      gridLineWidth = 1, gridLineColor = "var(--code-block-background)", lineColor = "var(--text-color)",
-      minorGridLineColor = "var(--text-color)", tickColor = "var(--text-color)", tickWidth = 1,
-      title = list(style = list(color = "var(--text-color)"))
-    ), yAxis = list(
-      labels = list(style = list(color = "var(--text-color)")),
-      gridLineDashStyle = "Dash",
-      gridLineWidth = 1, gridLineColor = "var(--code-block-background)", lineColor = "var(--text-color)",
-      minorGridLineColor = "var(--text-color)", tickColor = "var(--text-color)", tickWidth = 1,
-      title = list(style = list(color = "var(--text-color)"))    
-      ), legendBackgroundColor = "var(--page-background)",
-    background2 = "var(--page-background)", dataLabelsColor = "var(--text-color)", textColor = "var(--text-color)",
-    contrastTextColor = "var(--text-color)", maskColor = "rgba(255,255,255,0.3)",
-    title = list(style = list(color = "var(--text-color)")), subtitle = list(
-      style = list(color = "var(--text-color)")
-    ), legend = list(
-      itemStyle = list(
-        color = "var(--text-color)"
-      ), itemHoverStyle = list(color = "var(--text-color)"),
-      itemHiddenStyle = list(color = "var(--text-color)")
-    )
-
-)
-
-thm <- hc_theme_merge(
-  hc_theme_darkunica(),
-  thm
-)
-
-options(highcharter.theme = thm)
-
-
-highcharter::highcharts_demo()
-```
-
 
 
 ## Line Charts
@@ -287,6 +289,39 @@ highchart() %>%
 
 ```
 
+```{r}
+
+n <- 6
+
+set.seed(123)
+
+colors <- c("#d35400", "#2980b9", "#2ecc71", "#f1c40f", "#2c3e50", "#7f8c8d")
+colors2 <- c("#000004", "#3B0F70", "#8C2981", "#DE4968", "#FE9F6D", "#FCFDBF")
+
+df <- data.frame(x = seq_len(n) - 1) %>% 
+  mutate(
+    y = 10 + x + 10 * sin(x - 1),
+    z = 5 + (x*y) - median(x*y),
+    e = 10 * abs(rnorm(length(x))) + 2,
+    e = round(e, 1),
+    low = y - e,
+    high = y + e,
+    value = round(y - 1),
+    name = sample(fruit[str_length(fruit) <= 5], size = n),
+    color = rep(colors, length.out = n)
+  ) %>% 
+  mutate_if(is.numeric, round, 1) %>% 
+  select(-e)
+
+catch_all_data <- df %>% 
+  mutate(
+    # label = name,
+    from = name[c(1, 1, 1, 2, 3, 4)],
+    to   = name[c(3, 4, 5, 3, 6, 6)],
+    weight = c(1, 1, 1, 1, 2, 2)
+  )
+
+```
 
 ## arcdiagram
 
@@ -386,6 +421,8 @@ The area range series is a carteseian series with higher and lower values foreac
 
 ```{r}
 jsonlite::fromJSON("https://cdn.jsdelivr.net/gh/highcharts/highcharts@v7.0.0/samples/data/range.json") -> area_range_data
+
+# area_range_data
 
 highchart() %>% 
   hc_add_series(data = as_tibble(area_range_data) %>% list_parse2(),type = "arearange") %>% 
@@ -505,7 +542,7 @@ A box plot is a convenient way of depicting groups of data through theirfive-num
 
 ```{r}
 
-hchart()
+# hchart()
 
 ```
 
@@ -593,7 +630,7 @@ sugar_and_fat %>%
   ) %>% 
   hc_subtitle(
     text = "Source: Euromonitor and OECD"
-  )
+  ) 
 
 
 
@@ -668,6 +705,19 @@ A bullet graph is a variation of a bar graph. The bullet graph featuresa single 
 
 Column series display one column per value along an X axis.
 
+
+```{r}
+
+diamonds %>% 
+  group_by(cut,clarity) %>% 
+  summarize(price = mean(price,na.rm=TRUE)) %>% 
+  ungroup() %>% 
+  hchart("column",hcaes(cut,price,group = clarity))
+
+
+```
+
+
 ```{=html}
 
 <div>
@@ -695,6 +745,24 @@ Column pyramid series display one pyramid per value along an X axis.To display h
 
 
 ## columnrange
+
+
+```{r}
+structure(list(name = "Temperatures", data = list(structure(c(-13.9, -16.7, -4.7, -4.4, -2.1, 5.9, 6.5, 4.7, 4.3, -3.5, -9.8, -11.5, 5.2, 10.6, 11.6, 16.8, 27.2, 29.4, 29.1, 25.4, 21.6, 15.1, 12.5, 8.4), .Dim = c(12L, 2L)))), class = "data.frame", row.names = 1L) %>% pull(data) %>% as.data.frame() %>% list_parse2() %>% 
+  hchart(type = "columnrange") %>% 
+  hc_xAxis(categories = month.abb) %>% 
+  hc_chart(inverted = TRUE) %>% 
+  hc_plotOptions(columnrange = list(dataLabels = list(
+  enabled = TRUE,
+  format = "{y}°C"
+))) %>% 
+  hc_legend(enabled = FALSE) %>% 
+  hc_title(text = "Temperature variation by month") %>% 
+  hc_subtitle(text = "Observed in Vik i Sogn, Norway, 2021 | Source: <a href=\"https://www.vikjavev.no/ver/\" target=\"_blank\">Vikjavev</a>")
+
+
+
+```
 
 
 
@@ -728,6 +796,37 @@ A cylinder graph is a variation of a 3d column graph. The cylinder graphfeatures
 
 A dependency wheel chart is a type of flow diagram, where all nodes arelaid out in a circle, and the flow between the are drawn as link bands.
 
+```{r}
+arc_data <- structure(list(from = c("Hamburg", "Hamburg", "Hamburg", "Hannover", 
+"Hannover", "Berlin", "Berlin", "Berlin", "Berlin", "Berlin", 
+"Berlin", "München", "München", "München", "München", "München", 
+"Stuttgart", "Frankfurt", "Frankfurt", "Frankfurt", "Frankfurt", 
+"Düsseldorf", "Düsseldorf", "Amsterdam", "Paris", "Paris", 
+"Paris", "Paris", "Paris", "Paris", "Paris", "Paris", "Paris", 
+"Nantes", "Bordeaux", "Nantes", "Milano", "Milano", "Milano", 
+"Milano", "Milano", "Milano", "Torino", "Venezia", "Roma", "Roma", 
+"Roma", "Catania"), to = c("Stuttgart", "Frankfurt", "München", 
+"Wien", "München", "Wien", "München", "Stuttgart", "Frankfurt", 
+"Köln", "Düsseldorf", "Düsseldorf", "Wien", "Frankfurt", "Köln", 
+"Amsterdam", "Wien", "Wien", "Amsterdam", "Paris", "Budapest", 
+"Wien", "Hamburg", "Paris", "Brest", "Nantes", "Bayonne", "Bordeaux", 
+"Toulouse", "Montpellier", "Marseille", "Nice", "Milano", "Nice", 
+"Lyon", "Lyon", "München", "Roma", "Bari", "Napoli", "Brindisi", 
+"Lamezia Terme", "Roma", "Napoli", "Bari", "Catania", "Brindisi", 
+"Milano"), weight = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
+1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
+1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)), class = c("tbl_df", 
+"tbl", "data.frame"), row.names = c(NA, -48L))
+
+highchart() %>% 
+  hc_add_series(
+    type = "dependencywheel",
+    data = list_parse(arc_data)
+  )
+
+```
+
+
 ```{=html}
 
 <div>
@@ -755,7 +854,22 @@ The dumbbell series is a cartesian series with higher and lower valuesfor each p
 
 ## dumbbell
 
+
+
 Requires highcharts-more.js and modules/dumbbell.js.
+
+```{r}
+
+tibble(
+  name = sample(letters,10),
+  high = rnorm(10),
+  low = rnorm(10)
+) %>% 
+  hchart("dumbbell",hcaes(x = name))
+
+
+```
+
 
 ```{=html}
 
@@ -769,6 +883,41 @@ Requires highcharts-more.js and modules/dumbbell.js.
 
 
 ## errorbar
+
+```{r}
+example_dat <- tibble(
+  Type = c("Human", "High-Elf", "Orc"), 
+  key = c("World1", "World2", "World3")
+  ) %>% 
+  expand.grid() %>% 
+  mutate(mean = runif(9, 5, 7)) %>% 
+  mutate(sd = runif(9, 0.5, 1)) 
+
+hchart(
+  example_dat, 
+  "column",
+  hcaes(x = key, y = mean, group = Type),
+  id = c("a", "b", "c")
+  ) %>%
+  
+  hc_add_series(
+    example_dat,
+    "errorbar", 
+    hcaes(y = mean, x = key, low = mean - sd, high = mean + sd, group = Type),
+    linkedTo = c("a", "b", "c"),
+    enableMouseTracking = TRUE,
+    showInLegend = FALSE
+    ) %>% 
+  
+  hc_plotOptions(
+    errorbar = list(
+      color = "black", 
+      # whiskerLength = 1,
+      stemWidth = 1
+    ) 
+  ) 
+```
+
 
 Error bars are a graphical representation of the variability of data andare used on graphs to indicate the error, or uncertainty in a reportedmeasurement.
 
@@ -784,6 +933,18 @@ Error bars are a graphical representation of the variability of data andare used
 
 
 ## funnel
+
+```{r}
+
+structure(list(name = c("Website visits", "Downloads", "Requested price list", 
+"Invoice sent", "Finalized"), y = c(15654, 4064, 1987, 976, 846
+)), class = c("tbl_df", "tbl", "data.frame"), row.names = c(NA, 
+-5L)) %>% 
+  hchart(type = "funnel")
+
+
+```
+
 
 Funnel charts are a type of chart often used to visualize stages in asales project, where the top are the initial stages with the mostclients. It requires that the modules/funnel.js file is loaded.
 
@@ -829,6 +990,47 @@ It requires that the highcharts-3d.js, cylinder.js andfunnel3d.js module are loa
 
 Gauges are circular plots displaying one or more values with a dialpointing to values along the perimeter.
 
+```{r}
+col_stops <- data.frame(
+  q = c(0.15, 0.4, .8),
+  c = c('#55BF3B', '#DDDF0D', '#DF5353'),
+  stringsAsFactors = FALSE
+)
+
+highchart() %>%
+  hc_chart(type = "solidgauge") %>%
+  hc_pane(
+    startAngle = -90,
+    endAngle = 90,
+    background = list(
+      outerRadius = '100%',
+      innerRadius = '60%',
+      shape = "arc"
+    )
+  ) %>%
+  hc_tooltip(enabled = FALSE) %>% 
+  hc_yAxis(
+    stops = list_parse2(col_stops),
+    lineWidth = 0,
+    minorTickWidth = 0,
+    tickAmount = 2,
+    min = 0,
+    max = 100,
+    labels = list(y = 26, style = list(fontSize = "22px"))
+  ) %>%
+  hc_add_series(
+    data = 90,
+    dataLabels = list(
+      y = -50,
+      borderWidth = 0,
+      useHTML = TRUE,
+      style = list(fontSize = "40px")
+    )
+  ) %>% 
+  hc_size(height = 300)
+```
+
+
 ```{=html}
 
 <div>
@@ -842,6 +1044,16 @@ Gauges are circular plots displaying one or more values with a dialpointing to v
 ## heatmap
 
 A heatmap is a graphical representation of data where the individualvalues contained in a matrix are represented as colors.
+
+
+```{r}
+economics_long %>% 
+  mutate(date = as_factor(as.character(date))) %>% 
+  hchart("heatmap",hcaes(x = date, y = variable,value = value01)) %>% 
+  hc_size(width = 900)
+
+```
+
 
 ```{=html}
 
@@ -873,6 +1085,13 @@ Requires modules/heatmap.
 
 A histogram is a column series which represents the distribution of thedata set in the base series. Histogram splits data into bins and showstheir frequencies.
 
+```{r}
+x <- diamonds$price
+hchart(x)
+hchart(density(x), type = "area", color = "#B71C1C", name = "Price")
+```
+
+
 ```{=html}
 
 <div>
@@ -886,6 +1105,46 @@ A histogram is a column series which represents the distribution of thedata set 
 ## item
 
 An item chart is an infographic chart where a number of items are laidout in either a rectangular or circular pattern. It can be used tovisualize counts within a group, or for the circular pattern, typicallya parliament.
+
+```{r}
+df <- data.frame(
+  stringsAsFactors = FALSE,
+  name = c(
+    "The Left",
+    "Social Democratic Party",
+    "Alliance 90/The Greens",
+    "Free Democratic Party",
+    "Christian Democratic Union",
+    "Christian Social Union in Bavaria",
+    "Alternative for Germany"
+  ),
+  count = c(69, 153, 67, 80, 200, 46, 94),
+  col = c("#BE3075", "#EB001F", "#64A12D", "#FFED00",
+          "#000000", "#008AC5", "#009EE0"
+  ),
+  abbrv = c("DIE LINKE", "SPD", "GRÜNE", "FDP", "CDU", "CSU", "AfD")
+)
+
+hchart(
+  df,
+  "item",
+  hcaes(
+    name = name,
+    y = count,
+    label = abbrv,
+    color = col
+  ),
+  name = "Representatives",
+  showInLegend = TRUE,
+  size = "100%",
+  center = list("50%", "75%"),
+  startAngle = -100,
+  endAngle  = 100
+) %>%
+  hc_title(text = "Item chart with different layout") %>%
+  hc_legend(labelFormat = '{name} <span style="opacity: 0.4">{y}</span>')
+```
+
 
 ```{=html}
 
@@ -919,6 +1178,14 @@ The circular layout has much in common with a pie chart. Many of the itemseries 
 
 A line series displays information as a series of data points connected bystraight line segments.
 
+```{r}
+
+economics %>% 
+  hchart("line",hcaes(date,pce))
+
+```
+
+
 ```{=html}
 
 <div>
@@ -932,6 +1199,18 @@ A line series displays information as a series of data points connected bystraig
 ## lollipop
 
 The lollipop series is a carteseian series with a line anchored fromthe x axis and a dot at the end to mark the value.Requires highcharts-more.js, modules/dumbbell.js andmodules/lollipop.js.
+
+```{r}
+tibble(
+  name = sample(letters,10),
+  # high = rnorm(10),
+  low = rnorm(10)
+) %>% 
+  hchart("lollipop",hcaes(x = name)) %>% 
+  hc_add_dependency("modules/lollipop.js")
+```
+
+
 
 ```{=html}
 
@@ -1061,6 +1340,19 @@ hc %>%
 ## pareto
 
 A pareto diagram is a type of chart that contains both bars and a linegraph, where individual values are represented in descending order bybars, and the cumulative total is represented by the line.
+
+```{r,eval=FALSE}
+
+catch_all_data %>% 
+  select(x,y) %>% 
+  hchart("pareto") %>% 
+  # hc_add_series(type = "pareto",baseSeries = 1L,
+  #               tooltip = list(valueDecimals = 2)) %>% 
+  hc_tooltip(shared = TRUE) %>% 
+  hc_add_dependency("modules/pareto.js")
+
+```
+
 
 ```{=html}
 
@@ -1198,6 +1490,12 @@ hchart(data_to_sankey(diamonds2), "sankey", name = "diamonds")
 
 
 ## scatter
+
+```{r}
+hchart(sample_n(diamonds,1000),"scatter",hcaes(carat,price,group = clarity))
+
+```
+
 
 A scatter plot uses cartesian coordinates to display values for twovariables for a set of data.
 
@@ -1834,31 +2132,73 @@ js_examples %>%
 
 ctx <- V8::v8()
 
-group_code %>%
-  filter(group == "bubble") %>%
-  split(.$group) %>%
-  map(~ {
-    .x %>%
+parse_code <- function(x){
+      x %>%
       split(.$code_group) %>%
       imap(~ {
-            .x <- .x %>%
-              mutate(code_line = case_when(
-                row_number() == max(row_number()) & str_sub(code_line, -1L, -1L) == "," ~ str_sub(code_line, 1, -2L), TRUE ~ code_line
-              )) %>%
-              print()
+        .x <- .x %>%
+          mutate(code_line = case_when(
+            row_number() == max(row_number()) & str_sub(code_line, -1L, -1L) == "," ~ str_sub(code_line, 1, -2L), TRUE ~ code_line
+          ))
 
-            ctx$eval(JS(pull(.x, code_line) %>% paste(collapse = "")))
-            ctx$eval(glue::glue("console.r.assign('test2',JSON.stringify({unique(.x$code_group)}))"))
+        ctx$eval(JS(pull(.x, code_line) %>% paste(collapse = "")))
+        ctx$eval(glue::glue("console.r.assign('eval_js_example',JSON.stringify({unique(.x$code_group)}))"))
 
-            jsonlite::fromJSON(test2)
-              
-          
-      }) %>% 
-      imap(~{
-        glue::glue("hc_{.y}({capture.output(dput(.x)) %>% paste(collapse = '')})")
-      })
-  })
+        jsonlite::fromJSON(eval_js_example)
+      }) %>%
+      imap(~ {
+        out_str <- glue::glue("hc_{.y}({capture.output(dput(.x)) %>% paste(collapse = '')})")
+        if(!.y %in% c("series","colors")){
+          out_str <- out_str %>% stringr::str_replace_all(",",",\n")
+        }
+        
+        if(str_detect(out_str,glue::glue("hc_{.y}\\(list\\("))){
 
+            out_str %>%
+          stringr::str_remove("list\\(") %>%
+          stringi::stri_reverse() %>% stringr::str_remove("\\)") %>% stringi::stri_reverse()
+
+                    
+        }else{
+          out_str
+        }
+        
+      }) %>%
+      
+      styler::style_text()
+}
+
+parse_code_safely <- safely(parse_code)
+group_code %>%
+  # filter(group == "arc-diagram") %>% 
+  # print(n = nrow(.))
+  # filter(group == "bubble") %>%
+  split(.$group) %>%
+  map(~ {
+    # print(.x)
+    out_res <- parse_code_safely(.x)$result
+    out_res
+  }) -> out_code
+  
+out_code %>% 
+imap(~{
+  
+  if(!is.null(.x)){
+    code_lines <- paste(.x,collapse = "\n")
+      glue::glue(
+        "### {.y}
+
+        ```{{r,eval = FALSE}}
+
+        {code_lines}
+
+        ```\n\n"
+      )
+    
+  }
+  }) %>% 
+  unlist() %>% 
+  clipr::write_clip()
 
 
 

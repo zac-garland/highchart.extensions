@@ -1,0 +1,881 @@
+---
+title: "highcharts-explore"
+output: html_document
+date: '2022-11-13'
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### arc-diagram
+
+```{r,eval = FALSE}
+
+arc_data <- structure(list(from = c("Hamburg", "Hamburg", "Hamburg", "Hannover", 
+"Hannover", "Berlin", "Berlin", "Berlin", "Berlin", "Berlin", 
+"Berlin", "München", "München", "München", "München", "München", 
+"Stuttgart", "Frankfurt", "Frankfurt", "Frankfurt", "Frankfurt", 
+"Düsseldorf", "Düsseldorf", "Amsterdam", "Paris", "Paris", 
+"Paris", "Paris", "Paris", "Paris", "Paris", "Paris", "Paris", 
+"Nantes", "Bordeaux", "Nantes", "Milano", "Milano", "Milano", 
+"Milano", "Milano", "Milano", "Torino", "Venezia", "Roma", "Roma", 
+"Roma", "Catania"), to = c("Stuttgart", "Frankfurt", "München", 
+"Wien", "München", "Wien", "München", "Stuttgart", "Frankfurt", 
+"Köln", "Düsseldorf", "Düsseldorf", "Wien", "Frankfurt", "Köln", 
+"Amsterdam", "Wien", "Wien", "Amsterdam", "Paris", "Budapest", 
+"Wien", "Hamburg", "Paris", "Brest", "Nantes", "Bayonne", "Bordeaux", 
+"Toulouse", "Montpellier", "Marseille", "Nice", "Milano", "Nice", 
+"Lyon", "Lyon", "München", "Roma", "Bari", "Napoli", "Brindisi", 
+"Lamezia Terme", "Roma", "Napoli", "Bari", "Catania", "Brindisi", 
+"Milano"), weight = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
+1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
+1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)), class = c("tbl_df", 
+"tbl", "data.frame"), row.names = c(NA, -48L))
+
+
+
+highchart() %>% 
+  hc_add_series(
+    type = "arcdiagram",
+    data = list_parse(arc_data),
+    linkWeight = 1L, centeredLinks = TRUE
+  ) %>% 
+  hc_tooltip(enabled = TRUE,pointFormat = "{point.from}") %>% 
+  highcharter::hc_add_dependency("modules/arc-diagram.js") %>% 
+  hc_add_dependency("modules/sankey.js")
+
+  htmltools::tagList(
+    htmltools::tags$script(src = "https://code.highcharts.com/modules/arc-diagram.js"),
+    tags$script(src = "https://code.highcharts.com/modules/sankey.js")
+  ) %>% 
+  htmltools::html_print()
+#     highcharter::hc_add_dependency("plugins/arc-diagram.js")
+# highcharter::hc_add_dep
+# arc_data %>% 
+#   list_parse() %>% 
+#   hchart(type = "arcdiagram")
+
+# structure(list(keys = list(c("from", "to", "weight")), type = "arcdiagram", name = "Train connections", linkWeight = 1L, centeredLinks = TRUE, dataLabels = structure(list(rotation = 90L, y = 30L, align = "left", color = "black"), class = "data.frame", row.names = 1L), offset = "65%"), class = "data.frame", row.names = 1L)
+
+hc_accessibility(
+  description = "Arc diagram chart with circles of different sizes along the X axis,
+ and connections drawn as arcs between them. From the chart we can see that Paris is the city with the most connections to other cities.",
+  point = list(valueDescriptionFormat = "Connection from {point.from} to {point.to}.")
+)
+hc_colors(c("#293462", "#a64942", "#fe5f55", "#fff1c1", "#5bd1d7", "#ff502f", "#004d61", "#ff8a5c", "#fff591", "#f5587b", "#fad3cf", "#a696c8", "#5BE7C4", "#266A2E", "#593E1A"))
+hc_series(structure(list(keys = list(c("from", "to", "weight")), type = "arcdiagram", name = "Train connections", linkWeight = 1L, centeredLinks = TRUE, dataLabels = structure(list(rotation = 90L, y = 30L, align = "left", color = "black"), class = "data.frame", row.names = 1L), offset = "65%", data = list(structure(c("Hamburg", "Hamburg", "Hamburg", "Hannover", "Hannover", "Berlin", "Berlin", "Berlin", "Berlin", "Berlin", "Berlin", "München", "München", "München", "München", "München", "Stuttgart", "Frankfurt", "Frankfurt", "Frankfurt", "Frankfurt", "Düsseldorf", "Düsseldorf", "Amsterdam", "Paris", "Paris", "Paris", "Paris", "Paris", "Paris", "Paris", "Paris", "Paris", "Nantes", "Bordeaux", "Nantes", "Milano", "Milano", "Milano", "Milano", "Milano", "Milano", "Torino", "Venezia", "Roma", "Roma", "Roma", "Catania", "Stuttgart", "Frankfurt", "München", "Wien", "München", "Wien", "München", "Stuttgart", "Frankfurt", "Köln", "Düsseldorf", "Düsseldorf", "Wien", "Frankfurt", "Köln", "Amsterdam", "Wien", "Wien", "Amsterdam", "Paris", "Budapest", "Wien", "Hamburg", "Paris", "Brest", "Nantes", "Bayonne", "Bordeaux", "Toulouse", "Montpellier", "Marseille", "Nice", "Milano", "Nice", "Lyon", "Lyon", "München", "Roma", "Bari", "Napoli", "Brindisi", "Lamezia Terme", "Roma", "Napoli", "Bari", "Catania", "Brindisi", "Milano", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"), .Dim = c(48L, 3L)))), class = "data.frame", row.names = 1L))
+hc_title(text = "Main train connections in Europe")
+
+```
+
+### arearange
+
+```{r,eval = FALSE}
+
+hc_series(structure(list(name = c("USA", "USSR/Russia"), data = list(c(NA, NA, NA, NA, NA, 2L, 9L, 13L, 50L, 170L, 299L, 438L, 841L, 1169L, 1703L, 2422L, 3692L, 5543L, 7345L, 12298L, 18638L, 22229L, 25540L, 28133L, 29463L, 31139L, 31175L, 31255L, 29561L, 27552L, 26008L, 25830L, 26516L, 27835L, 28537L, 27519L, 25914L, 25542L, 24418L, 24138L, 24104L, 23208L, 22886L, 23305L, 23459L, 23368L, 23317L, 23575L, 23205L, 22217L, 21392L, 19008L, 13708L, 11511L, 10979L, 10904L, 11011L, 10903L, 10732L, 10685L, 10577L, 10526L, 10457L, 10027L, 8570L, 8360L, 7853L, 5709L, 5273L, 5113L, 5066L, 4897L, 4881L, 4804L, 4717L, 4571L, 4018L, 3822L, 3785L, 3805L, 3750L, 3708L, 3708L), c(NA, NA, NA, NA, NA, NA, NA, NA, NA, 1L, 5L, 25L, 50L, 120L, 150L, 200L, 426L, 660L, 863L, 1048L, 1627L, 2492L, 3346L, 4259L, 5242L, 6144L, 7091L, 8400L, 9490L, 10671L, 11736L, 13279L, 14600L, 15878L, 17286L, 19235L, 22165L, 24281L, 26169L, 28258L, 30665L, 32146L, 33486L, 35130L, 36825L, 38582L, 40159L, 38107L, 36538L, 35078L, 32980L, 29154L, 26734L, 24403L, 21339L, 18179L, 15942L, 15442L, 14368L, 13188L, 12188L, 11152L, 10114L, 9076L, 8038L, 7000L, 6643L, 6286L, 5929L, 5527L, 5215L, 4858L, 4750L, 4650L, 4600L, 4500L, 4490L, 4300L, 4350L, 4330L, 4310L, 4495L, 4477L))), class = "data.frame", row.names = 1:2))
+
+```
+
+### bubble
+
+```{r,eval = FALSE}
+
+hc_accessibility(point = list(valueDescriptionFormat = "{index}. {point.name},
+ fat: {point.x}g,
+ sugar: {point.y}g,
+ obesity: {point.z}%."))
+hc_chart(
+  type = "bubble",
+  plotBorderWidth = 1L,
+  zoomType = "xy"
+)
+hc_legend(enabled = FALSE)
+hc_plotOptions(series = list(dataLabels = list(
+  enabled = TRUE,
+  format = "{point.name}"
+)))
+hc_series(structure(list(data = list(structure(list(x = c(95, 86.5, 80.8, 80.4, 80.3, 78.4, 74.2, 73.5, 71, 69.2, 68.6, 65.5, 65.4, 63.4, 64), y = c(95, 102.9, 91.5, 102.5, 86.1, 70.1, 68.5, 83.1, 93.2, 57.6, 20, 126.4, 50.8, 51.8, 82.9), z = c(13.8, 14.7, 15.8, 12, 11.8, 16.6, 14.5, 10, 24.7, 10.4, 16, 35.3, 28.5, 15.4, 31.3), name = c("BE", "DE", "FI", "NL", "SE", "ES", "FR", "NO", "UK", "IT", "RU", "US", "HU", "PT", "NZ"), country = c("Belgium", "Germany", "Finland", "Netherlands", "Sweden", "Spain", "France", "Norway", "United Kingdom", "Italy", "Russia", "United States", "Hungary", "Portugal", "New Zealand")), class = "data.frame", row.names = c(NA, 15L)))), class = "data.frame", row.names = 1L))
+hc_subtitle(text = "Source: <a href=\"http://www.euromonitor.com/\">Euromonitor</a> and <a href=\"https://data.oecd.org/\">OECD</a>")
+hc_title(text = "Sugar and fat intake per country")
+hc_tooltip(
+  useHTML = TRUE,
+  headerFormat = "<table>",
+  pointFormat = "<tr><th colspan=\"2\"><h3>{point.country}</h3></th></tr><tr><th>Fat intake:</th><td>{point.x}g</td></tr><tr><th>Sugar intake:</th><td>{point.y}g</td></tr><tr><th>Obesity (adults):</th><td>{point.z}%</td></tr>",
+  footerFormat = "</table>",
+  followPointer = TRUE
+)
+hc_xAxis(
+  gridLineWidth = 1L,
+  title = list(text = "Daily fat intake"),
+  labels = list(format = "{value} gr"),
+  plotLines = structure(list(
+    color = "black",
+    dashStyle = "dot",
+    width = 2L,
+    value = 65L,
+    label = structure(list(
+      rotation = 0L,
+      y = 15L,
+      style = structure(list(fontStyle = "italic"),
+        class = "data.frame",
+        row.names = 1L
+      ),
+      text = "Safe fat intake 65g/day"
+    ),
+    class = "data.frame",
+    row.names = 1L
+    ),
+    zIndex = 3L
+  ),
+  class = "data.frame",
+  row.names = 1L
+  ),
+  accessibility = list(rangeDescription = "Range: 60 to 100 grams.")
+)
+hc_yAxis(
+  startOnTick = FALSE,
+  endOnTick = FALSE,
+  title = list(text = "Daily sugar intake"),
+  labels = list(format = "{value} gr"),
+  maxPadding = 0.2,
+  plotLines = structure(list(
+    color = "black",
+    dashStyle = "dot",
+    width = 2L,
+    value = 50L,
+    label = structure(list(
+      align = "right",
+      style = structure(list(fontStyle = "italic"),
+        class = "data.frame",
+        row.names = 1L
+      ),
+      text = "Safe sugar intake 50g/day",
+      x = -10L
+    ),
+    class = "data.frame",
+    row.names = 1L
+    ),
+    zIndex = 3L
+  ),
+  class = "data.frame",
+  row.names = 1L
+  ),
+  accessibility = list(rangeDescription = "Range: 0 to 160 grams.")
+)
+
+```
+
+### column-basic
+
+```{r,eval = FALSE}
+
+hc_chart(type = "column")
+hc_plotOptions(column = list(
+  pointPadding = 0.2,
+  borderWidth = 0L
+))
+highchart() %>% 
+hc_add_series(structure(list(name = c("Oil and gas extraction", "Manufacturing industries and mining", "Road traffic", "Agriculture"), data = list(c(13.93, 13.63, 13.73, 13.67, 14.37, 14.89, 14.56, 14.32, 14.13, 13.93, 13.21, 12.16), c(12.24, 12.24, 11.95, 12.02, 11.65, 11.96, 11.59, 11.94, 11.96, 11.59, 11.42, 11.76), c(10, 9.93, 9.97, 10.01, 10.23, 10.26, 10, 9.12, 9.36, 8.72, 8.38, 8.69), c(4.35, 4.32, 4.34, 4.39, 4.46, 4.52, 4.58, 4.55, 4.53, 4.51, 4.49, 4.57))), class = "data.frame", row.names = c(NA, 4L)))
+hc_subtitle(text = "Source: <a href=\"https://www.ssb.no/en/statbank/table/08940/\" target=\"_blank\">SSB</a>")
+hc_title(text = "Emissions to air in Norway")
+hc_tooltip(
+  headerFormat = "<span style=\"font-size:10px\">{point.key}</span><table>",
+  pointFormat = "<tr><td style=\"color:{series.color};padding:0\">{series.name}: </td><td style=\"padding:0\"><b>{point.y:.1f}</b></td></tr>",
+  footerFormat = "</table>",
+  shared = TRUE,
+  useHTML = TRUE
+)
+hc_xAxis(
+  categories = c(
+    "2010",
+    "2011",
+    "2012",
+    "2013",
+    "2014",
+    "2015",
+    "2016",
+    "2017",
+    "2018",
+    "2019",
+    "2020",
+    "2021"
+  ),
+  crosshair = TRUE
+)
+hc_yAxis(title = list(
+  useHTML = TRUE,
+  text = "Million tonnes CO<sub>2</sub>-equivalents"
+))
+
+```
+
+### column-pyramid
+
+```{r,eval = FALSE}
+
+hc_chart(type = "columnpyramid")
+hc_colors(c("#C79D6D", "#B5927B", "#CE9B84", "#B7A58C", "#C7A58C"))
+hc_series(structure(list(name = "Height", colorByPoint = TRUE, data = list(structure(c("Pyramid of Khufu", "Pyramid of Khafre", "Red Pyramid", "Bent Pyramid", "Pyramid of the Sun", "138.8", "136.4", "104", "101.1", "75"), .Dim = c(5L, 2L))), showInLegend = FALSE), class = "data.frame", row.names = 1L))
+hc_title(text = "The 5 highest pyramids in the World")
+hc_tooltip(valueSuffix = " m")
+hc_xAxis(
+  crosshair = TRUE,
+  labels = list(style = list(fontSize = "14px")),
+  type = "category"
+)
+hc_yAxis(
+  min = 0L,
+  title = list(text = "Height (m)")
+)
+
+```
+
+### columnrange
+
+```{r,eval = FALSE}
+
+hc_accessibility(description = "Image description: A column range chart compares the monthly temperature variations throughout 2017 in Vik I Sogn,
+ Norway. The chart is interactive and displays the temperature range for each month when hovering over the data. The temperature is measured in degrees Celsius on the X-axis and the months are plotted on the Y-axis. The lowest temperature is recorded in March at minus 10.2 Celsius. The lowest range of temperatures is found in December ranging from a low of minus 9 to a high of 8.6 Celsius. The highest temperature is found in July at 26.2 Celsius. July also has the highest range of temperatures from 6 to 26.2 Celsius. The broadest range of temperatures is found in May ranging from a low of minus 0.6 to a high of 23.1 Celsius.")
+hc_chart(
+  type = "columnrange",
+  inverted = TRUE
+)
+hc_legend(enabled = FALSE)
+hc_plotOptions(columnrange = list(dataLabels = list(
+  enabled = TRUE,
+  format = "{y}°C"
+)))
+hc_series(structure(list(name = "Temperatures", data = list(structure(c(-13.9, -16.7, -4.7, -4.4, -2.1, 5.9, 6.5, 4.7, 4.3, -3.5, -9.8, -11.5, 5.2, 10.6, 11.6, 16.8, 27.2, 29.4, 29.1, 25.4, 21.6, 15.1, 12.5, 8.4), .Dim = c(12L, 2L)))), class = "data.frame", row.names = 1L))
+hc_subtitle(text = "Observed in Vik i Sogn,
+ Norway,
+ 2021 | Source: <a href=\"https://www.vikjavev.no/ver/\" target=\"_blank\">Vikjavev</a>")
+hc_title(text = "Temperature variation by month")
+hc_tooltip(valueSuffix = "°C")
+hc_xAxis(categories = c(
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec"
+))
+hc_yAxis(title = list(text = "Temperature ( °C )"))
+
+```
+
+### cylinder
+
+```{r,eval = FALSE}
+highchart() %>% 
+hc_chart(
+  type = "cylinder",
+  options3d = list(
+    enabled = TRUE,
+    alpha = 15L,
+    beta = 15L,
+    depth = 50L,
+    viewDistance = 25L
+  )
+) %>% 
+  hc_add_series(type = "cylinder",
+    data = list(95321L, 169339L, 121105L, 136046L, 106800L, 58041L, 26766L, 14291L, 7065L, 3283L)
+  ) %>% 
+  hc_add_dependency("modules/cylinder.js") %>% 
+  hc_add_dependency("modules/highcharts-3d.js") %>% 
+  hc_tooltip(headerFormat = "<b>Age: {point.x}</b><br>",table = FALSE)
+
+hc_plotOptions(series = list(
+  depth = 25L,
+  colorByPoint = TRUE
+))
+hc_series(structure(list(data = list(), name = "Cases", showInLegend = FALSE), class = "data.frame", row.names = 1L))
+hc_subtitle(text = "Source: <a href=\"https://www.fhi.no/en/id/infectious-diseases/coronavirus/daily-reports/daily-reports-COVID19/\"target=\"_blank\">FHI</a>")
+hc_title(text = "Number of confirmed COVID-19")
+hc_tooltip(headerFormat = "<b>Age: {point.x}</b><br>")
+hc_xAxis(
+  categories = c(
+    "0-9",
+    "10-19",
+    "20-29",
+    "30-39",
+    "40-49",
+    "50-59",
+    "60-69",
+    "70-79",
+    "80-89",
+    "90+"
+  ),
+  title = list(text = "Age groups")
+)
+hc_yAxis(title = list(
+  margin = 20L,
+  text = "Reported cases"
+))
+
+```
+
+### dependency-wheel
+
+```{r,eval = TRUE}
+arc_data <- structure(list(from = c("Hamburg", "Hamburg", "Hamburg", "Hannover", 
+"Hannover", "Berlin", "Berlin", "Berlin", "Berlin", "Berlin", 
+"Berlin", "München", "München", "München", "München", "München", 
+"Stuttgart", "Frankfurt", "Frankfurt", "Frankfurt", "Frankfurt", 
+"Düsseldorf", "Düsseldorf", "Amsterdam", "Paris", "Paris", 
+"Paris", "Paris", "Paris", "Paris", "Paris", "Paris", "Paris", 
+"Nantes", "Bordeaux", "Nantes", "Milano", "Milano", "Milano", 
+"Milano", "Milano", "Milano", "Torino", "Venezia", "Roma", "Roma", 
+"Roma", "Catania"), to = c("Stuttgart", "Frankfurt", "München", 
+"Wien", "München", "Wien", "München", "Stuttgart", "Frankfurt", 
+"Köln", "Düsseldorf", "Düsseldorf", "Wien", "Frankfurt", "Köln", 
+"Amsterdam", "Wien", "Wien", "Amsterdam", "Paris", "Budapest", 
+"Wien", "Hamburg", "Paris", "Brest", "Nantes", "Bayonne", "Bordeaux", 
+"Toulouse", "Montpellier", "Marseille", "Nice", "Milano", "Nice", 
+"Lyon", "Lyon", "München", "Roma", "Bari", "Napoli", "Brindisi", 
+"Lamezia Terme", "Roma", "Napoli", "Bari", "Catania", "Brindisi", 
+"Milano"), weight = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
+1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
+1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)), class = c("tbl_df", 
+"tbl", "data.frame"), row.names = c(NA, -48L))
+
+highchart() %>% 
+  hc_add_series(
+    type = "dependencywheel",
+    data = list_parse(arc_data)
+  )
+
+
+
+
+```
+
+### euler-diagram
+
+```{r,eval = FALSE}
+
+hc_accessibility(point = list(valueDescriptionFormat = "{point.name}: {point.longDescription}."))
+hc_series(structure(list(type = "venn", data = list(structure(list(sets = list("A", "B", c("A", "B")), value = c(4L, 1L, 1L), name = c("Euler diagrams", "Venn diagrams", NA), longDescription = c("An Euler diagram is a diagrammatic means of representing sets and their relationships. Unlike Venn diagrams, which show all possible relations between different sets, the Euler diagram shows only relevant relationships.", "In Venn diagrams the curves are overlapped in every possible way, showing all possible relations between the sets. They are thus a special case of Euler diagrams, which do not necessarily show all relations", NA)), class = "data.frame", row.names = c(NA, 3L)))), class = "data.frame", row.names = 1L))
+hc_title(text = "Relationship between Euler and Venn diagrams")
+hc_tooltip(
+  headerFormat = "<span style=\"color:{point.color}\">•</span> <span style=\"font-size: 14px\"> {point.point.name}</span><br/>",
+  pointFormat = "{point.longDescription}<br><span style=\"font-size: 10px\">Source: Wikipedia</span>"
+)
+
+```
+
+### funnel
+
+```{r,eval = FALSE}
+
+hc_chart(type = "funnel")
+hc_legend(enabled = FALSE)
+hc_plotOptions(series = list(
+  dataLabels = list(
+    enabled = TRUE,
+    format = "<b>{point.name}</b> ({point.y:,
+.0f})",
+    softConnector = TRUE
+  ),
+  center = c(
+    "40%",
+    "50%"
+  ),
+  neckWidth = "30%",
+  neckHeight = "25%",
+  width = "80%"
+))
+hc_responsive(rules = structure(list(
+  condition = structure(list(maxWidth = 500L),
+    class = "data.frame",
+    row.names = 1L
+  ),
+  chartOptions = structure(list(plotOptions = structure(list(series = structure(list(
+    dataLabels = structure(list(inside = TRUE),
+      class = "data.frame",
+      row.names = 1L
+    ),
+    center = list(c(
+      "50%",
+      "50%"
+    )),
+    width = "100%"
+  ),
+  class = "data.frame",
+  row.names = 1L
+  )),
+  class = "data.frame",
+  row.names = 1L
+  )),
+  class = "data.frame",
+  row.names = 1L
+  )
+),
+class = "data.frame",
+row.names = 1L
+))
+hc_series(structure(list(name = "Unique users", data = list(structure(c("Website visits", "Downloads", "Requested price list", "Invoice sent", "Finalized", "15654", "4064", "1987", "976", "846"), .Dim = c(5L, 2L)))), class = "data.frame", row.names = 1L))
+hc_title(text = "Sales funnel")
+
+```
+
+### honeycomb-usa
+
+```{r,eval = FALSE}
+
+hc_accessibility(
+  description = "A tile map represents the states of the USA by population in 2016. The hexagonal tiles are positioned to geographically echo the map of the USA. A color-coded legend states the population levels as below 1 million (beige),
+ 1 to 5 million (orange),
+ 5 to 20 million (pink) and above 20 million (hot pink). The chart is interactive,
+ and the individual state data points are displayed upon hovering. Three states have a population of above 20 million: California (39.3 million),
+ Texas (27.9 million) and Florida (20.6 million). The northern US region from Massachusetts in the Northwest to Illinois in the Midwest contains the highest concentration of states with a population of 5 to 20 million people. The southern US region from South Carolina in the Southeast to New Mexico in the Southwest contains the highest concentration of states with a population of 1 to 5 million people. 6 states have a population of less than 1 million people; these include Alaska,
+ Delaware,
+ Wyoming,
+ North Dakota,
+ South Dakota and Vermont. The state with the lowest population is Wyoming in the Northwest with 584,
+153 people.",
+  screenReaderSection = list(beforeChartFormat = "<h5>{chartTitle}</h5><div>{chartSubtitle}</div><div>{chartLongdesc}</div><div>{viewTableButton}</div>"),
+  point = list(valueDescriptionFormat = "{index}. {xDescription},
+ {point.value}.")
+)
+hc_chart(
+  type = "tilemap",
+  inverted = TRUE,
+  height = "80%"
+)
+hc_colorAxis(dataClasses = structure(list(
+  from = c(
+    0L,
+    1000000L,
+    5000000L,
+    20000000L
+  ),
+  to = c(
+    1000000L,
+    5000000L,
+    20000000L,
+    NA
+  ),
+  color = c(
+    "#F9EDB3",
+    "#FFC428",
+    "#FF7987",
+    "#FF2371"
+  ),
+  name = c(
+    "< 1M",
+    "1M - 5M",
+    "5M - 20M",
+    "> 20M"
+  )
+),
+class = "data.frame",
+row.names = c(
+  NA,
+  4L
+)
+))
+hc_plotOptions(series = list(dataLabels = list(
+  enabled = TRUE,
+  format = "{point.hc-a2}",
+  color = "#000000",
+  style = list(textOutline = FALSE)
+)))
+hc_series(structure(list(name = "", data = list(structure(list(`hc-a2` = c("AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"), name = c("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "District of Columbia", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"), region = c("South", "West", "West", "South", "West", "West", "Northeast", "South", "South", "South", "South", "West", "West", "Midwest", "Midwest", "Midwest", "Midwest", "South", "South", "Northeast", "South", "Northeast", "Midwest", "Midwest", "South", "Midwest", "West", "Midwest", "West", "Northeast", "Northeast", "West", "Northeast", "South", "Midwest", "Midwest", "South", "West", "Northeast", "Northeast", "South", "Midwest", "South", "South", "West", "Northeast", "South", "West", "South", "Midwest", "West"), x = c(6L, 0L, 5L, 5L, 5L, 4L, 3L, 4L, 4L, 8L, 7L, 8L, 3L, 3L, 3L, 3L, 5L, 4L, 6L, 0L, 4L, 2L, 2L, 2L, 6L, 4L, 2L, 4L, 4L, 1L, 3L, 6L, 2L, 5L, 2L, 3L, 6L, 4L, 3L, 2L, 6L, 3L, 5L, 7L, 5L, 1L, 5L, 2L, 4L, 2L, 3L), y = c(7L, 0L, 3L, 6L, 2L, 3L, 11L, 9L, 10L, 8L, 8L, 0L, 2L, 6L, 7L, 5L, 5L, 6L, 5L, 11L, 8L, 10L, 7L, 4L, 6L, 5L, 2L, 4L, 2L, 11L, 10L, 3L, 9L, 9L, 3L, 8L, 4L, 1L, 9L, 11L, 8L, 4L, 7L, 4L, 4L, 10L, 8L, 1L, 7L, 5L, 3L), value = c(4849377L, 737732L, 6745408L, 2994079L, 39250017L, 5540545L, 3596677L, 935614L, 7288000L, 20612439L, 10310371L, 1419561L, 1634464L, 12801539L, 6596855L, 3107126L, 2904021L, 4413457L, 4649676L, 1330089L, 6016447L, 6811779L, 9928301L, 5519952L, 2984926L, 6093000L, 1023579L, 1881503L, 2839099L, 1326813L, 8944469L, 2085572L, 19745289L, 10146788L, 739482L, 11614373L, 3878051L, 3970239L, 12784227L, 1055173L, 4832482L, 853175L, 6651194L, 27862596L, 2942902L, 626011L, 8411808L, 7288000L, 1850326L, 5778708L, 584153L)), class = "data.frame", row.names = c(NA, 51L)))), class = "data.frame", row.names = 1L))
+hc_subtitle(text = "Source:<a href=\"https://simple.wikipedia.org/wiki/List_of_U.S._states_by_population\">Wikipedia</a>")
+hc_title(text = "U.S. states by population in 2016")
+hc_tooltip(
+  headerFormat = "",
+  pointFormat = "The population of <b> {point.name}</b> is <b>{point.value}</b>"
+)
+hc_xAxis(visible = FALSE)
+hc_yAxis(visible = FALSE)
+
+```
+
+### line-basic
+
+```{r,eval = FALSE}
+
+hc_legend(
+  layout = "vertical",
+  align = "right",
+  verticalAlign = "middle"
+)
+hc_plotOptions(series = list(
+  label = list(connectorAllowed = FALSE),
+  pointStart = 2010L
+))
+hc_responsive(rules = structure(list(
+  condition = structure(list(maxWidth = 500L),
+    class = "data.frame",
+    row.names = 1L
+  ),
+  chartOptions = structure(list(legend = structure(list(
+    layout = "horizontal",
+    align = "center",
+    verticalAlign = "bottom"
+  ),
+  class = "data.frame",
+  row.names = 1L
+  )),
+  class = "data.frame",
+  row.names = 1L
+  )
+),
+class = "data.frame",
+row.names = 1L
+))
+hc_series(structure(list(name = c("Installation & Developers", "Manufacturing", "Sales & Distribution", "Operations & Maintenance", "Other"), data = list(c(43934L, 48656L, 65165L, 81827L, 112143L, 142383L, 171533L, 165174L, 155157L, 161454L, 154610L), c(24916L, 37941L, 29742L, 29851L, 32490L, 30282L, 38121L, 36885L, 33726L, 34243L, 31050L), c(11744L, 30000L, 16005L, 19771L, 20185L, 24377L, 32147L, 30912L, 29243L, 29213L, 25663L), c(NA, NA, NA, NA, NA, NA, NA, NA, 11164L, 11218L, 10077L), c(21908L, 5548L, 8105L, 11248L, 8989L, 11816L, 18274L, 17300L, 13053L, 11906L, 10073L))), class = "data.frame", row.names = c(NA, 5L)))
+hc_subtitle(text = "Source: <a href=\"https://irecusa.org/programs/solar-jobs-census/\" target=\"_blank\">IREC</a>")
+hc_title(text = "U.S Solar Employment Growth by Job Category,
+ 2010-2020")
+hc_xAxis(accessibility = list(rangeDescription = "Range: 2010 to 2020"))
+hc_yAxis(title = list(text = "Number of Employees"))
+
+```
+
+### lollipop
+
+```{r,eval = FALSE}
+
+hc_accessibility(point = list(valueDescriptionFormat = "{index}. {xDescription},
+ {point.y}."))
+hc_chart(type = "lollipop")
+hc_legend(enabled = FALSE)
+hc_series(structure(list(name = "Population", data = list(structure(list(name = c("China", "India", "United States", "Indonesia", "Pakistan", "Brazil", "Nigeria", "Bangladesh", "Russia", "Mexico"), low = c(1444216107L, 1393409038L, 332915073L, 276361783L, 225199937L, 213993437L, 211400708L, 166303498L, 145912025L, 130262216L)), class = "data.frame", row.names = c(NA, 10L)))), class = "data.frame", row.names = 1L))
+hc_subtitle(text = "2021")
+hc_title(text = "Top 10 Countries by Population")
+hc_tooltip(shared = TRUE)
+hc_xAxis(type = "category")
+hc_yAxis(title = list(text = "Population"))
+
+```
+
+### organization-chart
+
+```{r,eval = FALSE}
+
+hc_accessibility(point = structure(list(),
+  .Names = character(0)
+))
+hc_chart(
+  height = 600L,
+  inverted = TRUE
+)
+hc_exporting(
+  allowHTML = TRUE,
+  sourceWidth = 800L,
+  sourceHeight = 600L
+)
+hc_series(structure(list(type = "organization", name = "Highsoft", keys = list(c("from", "to")), data = list(structure(c("Shareholders", "Board", "CEO", "CEO", "CEO", "CEO", "CTO", "CTO", "CSO", "HR", "CSO", "HR", "CTO", "Board", "CEO", "CTO", "CPO", "CSO", "HR", "Product", "Web", "Sales", "Market", "Market", "Market", "Market"), .Dim = c(13L, 2L))), levels = list(structure(list(level = c(0L, 1L, 2L, 4L), color = c("silver", "silver", "#980104", "#359154"), dataLabels = structure(list(color = c("black", "black", NA, NA)), class = "data.frame", row.names = c(NA, 4L)), height = c(25L, 25L, NA, NA)), class = "data.frame", row.names = c(NA, 4L))), nodes = list(structure(list(id = c("Shareholders", "Board", "CEO", "HR", "CTO", "CPO", "CSO", "Product", "Web", "Sales", "Market"), title = c(NA, NA, "CEO", "CFO", "CTO", "CPO", "CSO", NA, NA, NA, NA), name = c(NA, NA, "Atle Sivertsen", "Anne Jorunn Fjærestad", "Christer Vasseng", "Torstein Hønsi", "Anita Nesse", "Product developers", "Web devs, sys admin", "Sales team", "Marketing team"), image = c(NA, NA, "https://wp-assets.highcharts.com/www-highcharts-com/blog/wp-content/uploads/2022/06/30081411/portrett-sorthvitt.jpg", "https://wp-assets.highcharts.com/www-highcharts-com/blog/wp-content/uploads/2020/03/17131210/Highsoft_04045_.jpg", "https://wp-assets.highcharts.com/www-highcharts-com/blog/wp-content/uploads/2020/03/17131120/Highsoft_04074_.jpg", "https://wp-assets.highcharts.com/www-highcharts-com/blog/wp-content/uploads/2020/03/17131213/Highsoft_03998_.jpg", "https://wp-assets.highcharts.com/www-highcharts-com/blog/wp-content/uploads/2020/03/17131156/Highsoft_03834_.jpg", NA, NA, NA, NA), color = c(NA, NA, NA, "#007ad0", NA, NA, NA, NA, NA, NA, NA), column = c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 5L)), class = "data.frame", row.names = c(NA, 11L))), colorByPoint = FALSE, color = "#007ad0", dataLabels = structure(list(color = "white"), class = "data.frame", row.names = 1L), borderColor = "white", nodeWidth = 65L), class = "data.frame", row.names = 1L))
+hc_title(text = "Highcharts Org Chart")
+hc_tooltip(outside = TRUE)
+
+```
+
+### packed-bubble
+
+```{r,eval = FALSE}
+
+hc_chart(
+  type = "packedbubble",
+  height = "100%"
+)
+hc_plotOptions(packedbubble = list(
+  minSize = "30%",
+  maxSize = "120%",
+  zMin = 0L,
+  zMax = 1000L,
+  layoutAlgorithm = list(
+    splitSeries = FALSE,
+    gravitationalConstant = 0.02
+  ),
+  dataLabels = list(
+    enabled = TRUE,
+    format = "{point.name}",
+    filter = list(
+      property = "y",
+      operator = ">",
+      value = 250L
+    ),
+    style = list(
+      color = "black",
+      textOutline = "none",
+      fontWeight = "normal"
+    )
+  )
+))
+hc_series(structure(list(name = c("Europe", "Africa", "Oceania", "North America", "South America", "Asia"), data = list(structure(list(name = c("Germany", "Croatia", "Belgium", "Czech Republic", "Netherlands", "Spain", "Ukraine", "Poland", "France", "Romania", "United Kingdom", "Turkey", "Italy", "Greece", "Austria", "Belarus", "Serbia", "Finland", "Bulgaria", "Portugal", "Norway", "Sweden", "Hungary", "Switzerland", "Denmark", "Slovakia", "Ireland", "Croatia", "Estonia", "Slovenia", "Lithuania", "Luxembourg", "Macedonia", "Moldova", "Latvia", "Cyprus"), value = c(767.1, 20.7, 97.2, 111.7, 158.1, 241.6, 249.1, 298.1, 323.7, 78.3, 415.4, 353.2, 337.6, 71.1, 69.8, 67.7, 59.3, 54.8, 51.2, 48.3, 44.4, 44.3, 43.7, 40.2, 40, 34.7, 34.6, 20.7, 19.4, 16.7, 12.3, 10.4, 9.5, 7.8, 7.5, 7.2)), class = "data.frame", row.names = c(NA, 36L)), structure(list(name = c("Senegal", "Cameroon", "Zimbabwe", "Ghana", "Kenya", "Sudan", "Tunisia", "Angola", "Libya", "Ivory Coast", "Morocco", "Ethiopia", "United Republic of Tanzania", "Nigeria", "South Africa", "Egypt", "Algeria"), value = c(8.2, 9.2, 13.1, 14.1, 14.1, 17.3, 24.3, 25, 50.6, 7.3, 60.7, 8.9, 9.1, 93.9, 392.7, 225.1, 141.5)), class = "data.frame", row.names = c(NA, 17L)), structure(list(name = c("Australia", "New Zealand", "Papua New Guinea"), value = c(409.4, 34.1, 7.1)), class = "data.frame", row.names = c(NA, 3L)), structure(list(name = c("Costa Rica", "Honduras", "Jamaica", "Panama", "Guatemala", "Dominican Republic", "Cuba", "USA", "Canada", "Mexico"), value = c(7.6, 8.4, 8.3, 10.2, 12, 23.4, 30.2, 5334.5, 566, 456.3)), class = "data.frame", row.names = c(NA, 10L)), structure(list(name = c("El Salvador", "Uruguay", "Bolivia", "Trinidad and Tobago", "Ecuador", "Chile", "Peru", "Colombia", "Brazil", "Argentina", "Venezuela"), value = c(7.2, 8.1, 17.8, 34, 43, 78.6, 52, 74.1, 501.1, 199, 195.2)), class = "data.frame", row.names = c(NA, 11L)), structure(list(name = c("Nepal", "Georgia", "Brunei Darussalam", "Kyrgyzstan", "Afghanistan", "Myanmar", "Mongolia", "Sri Lanka", "Bahrain", "Yemen", "Jordan", "Lebanon", "Azerbaijan", "Singapore", "Hong Kong", "Syria", "DPR Korea", "Israel", "Turkmenistan", "Oman", "Qatar", "Philippines", "Kuwait", "Uzbekistan", "Iraq", "Pakistan", "Vietnam", "United Arab Emirates", "Malaysia", "Kazakhstan", "Thailand", "Taiwan", "Indonesia", "Saudi Arabia", "Japan", "China", "India", "Russia", "Iran", "Korea"), value = c(6.5, 6.5, 7.4, 7.4, 7.9, 9.1, 14.7, 16.6, 20.5, 22.6, 22.3, 21.1, 31.7, 47.8, 49.9, 52.7, 59.9, 64.8, 70.6, 74.3, 88.8, 96.9, 98.6, 122.6, 139.9, 158.1, 190.2, 201.1, 227.5, 236.2, 272, 276.7, 453, 494.8, 1278.9, 10540.8, 2341.9, 1766.4, 618.2, 610.1)), class = "data.frame", row.names = c(NA, 40L)))), class = "data.frame", row.names = c(NA, 6L)))
+hc_title(text = "Carbon emissions around the world (2014)")
+hc_tooltip(
+  useHTML = TRUE,
+  pointFormat = "<b>{point.name}:</b> {point.value}m CO<sub>2</sub>"
+)
+
+```
+
+### packed-bubble-split
+
+```{r,eval = FALSE}
+
+hc_chart(
+  type = "packedbubble",
+  height = "100%"
+)
+hc_plotOptions(packedbubble = list(
+  minSize = "20%",
+  maxSize = "100%",
+  zMin = 0L,
+  zMax = 1000L,
+  layoutAlgorithm = list(
+    gravitationalConstant = 0.05,
+    splitSeries = TRUE,
+    seriesInteraction = FALSE,
+    dragBetweenSeries = TRUE,
+    parentNodeLimit = TRUE
+  ),
+  dataLabels = list(
+    enabled = TRUE,
+    format = "{point.name}",
+    filter = list(
+      property = "y",
+      operator = ">",
+      value = 250L
+    ),
+    style = list(
+      color = "black",
+      textOutline = "none",
+      fontWeight = "normal"
+    )
+  )
+))
+hc_series(structure(list(name = c("Europe", "Africa", "Oceania", "North America", "South America", "Asia"), data = list(structure(list(name = c("Germany", "Croatia", "Belgium", "Czech Republic", "Netherlands", "Spain", "Ukraine", "Poland", "France", "Romania", "United Kingdom", "Turkey", "Italy", "Greece", "Austria", "Belarus", "Serbia", "Finland", "Bulgaria", "Portugal", "Norway", "Sweden", "Hungary", "Switzerland", "Denmark", "Slovakia", "Ireland", "Croatia", "Estonia", "Slovenia", "Lithuania", "Luxembourg", "Macedonia", "Moldova", "Latvia", "Cyprus"), value = c(767.1, 20.7, 97.2, 111.7, 158.1, 241.6, 249.1, 298.1, 323.7, 78.3, 415.4, 353.2, 337.6, 71.1, 69.8, 67.7, 59.3, 54.8, 51.2, 48.3, 44.4, 44.3, 43.7, 40.2, 40, 34.7, 34.6, 20.7, 19.4, 16.7, 12.3, 10.4, 9.5, 7.8, 7.5, 7.2)), class = "data.frame", row.names = c(NA, 36L)), structure(list(name = c("Senegal", "Cameroon", "Zimbabwe", "Ghana", "Kenya", "Sudan", "Tunisia", "Angola", "Libya", "Ivory Coast", "Morocco", "Ethiopia", "United Republic of Tanzania", "Nigeria", "South Africa", "Egypt", "Algeria"), value = c(8.2, 9.2, 13.1, 14.1, 14.1, 17.3, 24.3, 25, 50.6, 7.3, 60.7, 8.9, 9.1, 93.9, 392.7, 225.1, 141.5)), class = "data.frame", row.names = c(NA, 17L)), structure(list(name = c("Australia", "New Zealand", "Papua New Guinea"), value = c(409.4, 34.1, 7.1)), class = "data.frame", row.names = c(NA, 3L)), structure(list(name = c("Costa Rica", "Honduras", "Jamaica", "Panama", "Guatemala", "Dominican Republic", "Cuba", "USA", "Canada", "Mexico"), value = c(7.6, 8.4, 8.3, 10.2, 12, 23.4, 30.2, 5334.5, 566, 456.3)), class = "data.frame", row.names = c(NA, 10L)), structure(list(name = c("El Salvador", "Uruguay", "Bolivia", "Trinidad and Tobago", "Ecuador", "Chile", "Peru", "Colombia", "Brazil", "Argentina", "Venezuela"), value = c(7.2, 8.1, 17.8, 34, 43, 78.6, 52, 74.1, 501.1, 199, 195.2)), class = "data.frame", row.names = c(NA, 11L)), structure(list(name = c("Nepal", "Georgia", "Brunei Darussalam", "Kyrgyzstan", "Afghanistan", "Myanmar", "Mongolia", "Sri Lanka", "Bahrain", "Yemen", "Jordan", "Lebanon", "Azerbaijan", "Singapore", "Hong Kong", "Syria", "DPR Korea", "Israel", "Turkmenistan", "Oman", "Qatar", "Philippines", "Kuwait", "Uzbekistan", "Iraq", "Pakistan", "Vietnam", "United Arab Emirates", "Malaysia", "Kazakhstan", "Thailand", "Taiwan", "Indonesia", "Saudi Arabia", "Japan", "China", "India", "Russia", "Iran", "Korea"), value = c(6.5, 6.5, 7.4, 7.4, 7.9, 9.1, 14.7, 16.6, 20.5, 22.6, 22.3, 21.1, 31.7, 47.8, 49.9, 52.7, 59.9, 64.8, 70.6, 74.3, 88.8, 96.9, 98.6, 122.6, 139.9, 158.1, 190.2, 201.1, 227.5, 236.2, 272, 276.7, 453, 494.8, 1278.9, 10540.8, 2341.9, 1766.4, 618.2, 610.1)), class = "data.frame", row.names = c(NA, 40L)))), class = "data.frame", row.names = c(NA, 6L)))
+hc_title(text = "Carbon emissions around the world (2014)")
+hc_tooltip(
+  useHTML = TRUE,
+  pointFormat = "<b>{point.name}:</b> {point.value}m CO<sub>2</sub>"
+)
+
+```
+
+### pareto
+
+```{r,eval = FALSE}
+
+hc_chart(
+  renderTo = "container",
+  type = "column"
+)
+hc_series(structure(list(type = c("pareto", "column"), name = c("Pareto", "Complaints"), yAxis = c(1L, NA), zIndex = c(10L, 2L), baseSeries = c(1L, NA), tooltip = structure(list(valueDecimals = c(2L, NA), valueSuffix = c("%", NA)), class = "data.frame", row.names = 1:2), data = list(NULL, c(755L, 222L, 151L, 86L, 72L, 51L, 36L, 10L))), class = "data.frame", row.names = 1:2))
+hc_title(text = "Restaurants Complaints")
+hc_tooltip(shared = TRUE)
+hc_xAxis(
+  categories = c(
+    "Overpriced",
+    "Small portions",
+    "Wait time",
+    "Food is tasteless",
+    "No atmosphere",
+    "Not clean",
+    "Too noisy",
+    "Unfriendly staff"
+  ),
+  crosshair = TRUE
+)
+hc_yAxis(structure(list(
+  title = structure(list(text = c(
+    "",
+    ""
+  )),
+  class = "data.frame",
+  row.names = 1:2
+  ),
+  minPadding = c(
+    NA,
+    0L
+  ),
+  maxPadding = c(
+    NA,
+    0L
+  ),
+  max = c(
+    NA,
+    100L
+  ),
+  min = c(
+    NA,
+    0L
+  ),
+  opposite = c(
+    NA,
+    TRUE
+  ),
+  labels = structure(list(format = c(
+    NA,
+    "{value}%"
+  )),
+  class = "data.frame",
+  row.names = 1:2
+  )
+),
+class = "data.frame",
+row.names = 1:2
+))
+
+```
+
+### pie-basic
+
+```{r,eval = FALSE}
+
+hc_accessibility(point = list(valueSuffix = "%"))
+hc_chart(
+  plotBackgroundColor = NULL,
+  plotBorderWidth = NULL,
+  plotShadow = FALSE,
+  type = "pie"
+)
+hc_plotOptions(pie = list(
+  allowPointSelect = TRUE,
+  cursor = "pointer",
+  dataLabels = list(
+    enabled = TRUE,
+    format = "<b>{point.name}</b>: {point.percentage:.1f} %"
+  )
+))
+hc_series(structure(list(name = "Brands", colorByPoint = TRUE, data = list(structure(list(name = c("Chrome", "Edge", "Firefox", "Safari", "Internet Explorer", "Opera", "Sogou Explorer", "QQ", "Other"), y = c(70.67, 14.77, 4.86, 2.63, 1.53, 1.4, 0.84, 0.51, 2.6), sliced = c(TRUE, NA, NA, NA, NA, NA, NA, NA, NA), selected = c(TRUE, NA, NA, NA, NA, NA, NA, NA, NA)), class = "data.frame", row.names = c(NA, 9L)))), class = "data.frame", row.names = 1L))
+hc_title(text = "Browser market shares in May,
+ 2020")
+hc_tooltip(pointFormat = "{series.name}: <b>{point.percentage:.1f}%</b>")
+
+```
+
+### pyramid
+
+```{r,eval = FALSE}
+
+hc_chart(type = "pyramid")
+hc_legend(enabled = FALSE)
+hc_plotOptions(series = list(
+  dataLabels = list(
+    enabled = TRUE,
+    format = "<b>{point.name}</b> ({point.y:,
+.0f})",
+    softConnector = TRUE
+  ),
+  center = c(
+    "40%",
+    "50%"
+  ),
+  width = "80%"
+))
+hc_responsive(rules = structure(list(
+  condition = structure(list(maxWidth = 500L),
+    class = "data.frame",
+    row.names = 1L
+  ),
+  chartOptions = structure(list(plotOptions = structure(list(series = structure(list(
+    dataLabels = structure(list(inside = TRUE),
+      class = "data.frame",
+      row.names = 1L
+    ),
+    center = list(c(
+      "50%",
+      "50%"
+    )),
+    width = "100%"
+  ),
+  class = "data.frame",
+  row.names = 1L
+  )),
+  class = "data.frame",
+  row.names = 1L
+  )),
+  class = "data.frame",
+  row.names = 1L
+  )
+),
+class = "data.frame",
+row.names = 1L
+))
+hc_series(structure(list(name = "Unique users", data = list(structure(c("Website visits", "Downloads", "Requested price list", "Invoice sent", "Finalized", "15654", "4064", "1987", "976", "846"), .Dim = c(5L, 2L)))), class = "data.frame", row.names = 1L))
+hc_title(
+  text = "Sales pyramid",
+  x = -50L
+)
+
+```
+
+### sankey-diagram
+
+```{r,eval = FALSE}
+
+hc_accessibility(point = list(valueDescriptionFormat = "{index}. {point.from} to {point.to},
+ {point.weight}."))
+hc_series(structure(list(keys = list(c("from", "to", "weight")), data = list(structure(c("Brazil", "Brazil", "Brazil", "Brazil", "Canada", "Canada", "Canada", "Mexico", "Mexico", "Mexico", "Mexico", "USA", "USA", "USA", "USA", "Portugal", "Portugal", "Portugal", "Portugal", "France", "France", "France", "France", "France", "Spain", "Spain", "Spain", "England", "England", "England", "England", "South Africa", "South Africa", "South Africa", "Angola", "Angola", "Angola", "Senegal", "Senegal", "Senegal", "Mali", "Mali", "Mali", "Morocco", "Morocco", "Morocco", "Portugal", "France", "Spain", "England", "Portugal", "France", "England", "Portugal", "France", "Spain", "England", "Portugal", "France", "Spain", "England", "Angola", "Senegal", "Morocco", "South Africa", "Angola", "Senegal", "Mali", "Morocco", "South Africa", "Senegal", "Morocco", "South Africa", "Angola", "Senegal", "Morocco", "South Africa", "China", "India", "Japan", "China", "India", "Japan", "China", "India", "Japan", "China", "India", "Japan", "China", "India", "Japan", "5", "1", "1", "1", "1", "5", "1", "1", "1", "5", "1", "1", "1", "1", "5", "2", "1", "1", "3", "1", "3", "3", "3", "1", "1", "3", "1", "1", "1", "2", "7", "5", "1", "3", "5", "1", "3", "5", "1", "3", "5", "1", "3", "5", "1", "3"), .Dim = c(46L, 3L))), type = "sankey", name = "Sankey demo series"), class = "data.frame", row.names = 1L))
+hc_title(text = "Highcharts Sankey Diagram")
+
+```
+
+### treemap-large-dataset
+
+```{r,eval = FALSE}
+
+hc_exporting(
+  allowHTML = TRUE,
+  sourceWidth = 800L,
+  sourceHeight = 600L
+)
+
+```
+
+### variable-radius-pie
+
+```{r,eval = FALSE}
+
+hc_chart(type = "variablepie")
+hc_series(structure(list(minPointSize = 10L, innerSize = "20%", zMin = 0L, name = "countries", data = list(structure(list(name = c("Spain", "France", "Poland", "Czech Republic", "Italy", "Switzerland", "Germany"), y = c(505992L, 551695L, 312679L, 78865L, 301336L, 41284L, 357114L), z = c(92L, 119L, 121L, 136L, 200L, 213L, 235L)), class = "data.frame", row.names = c(NA, 7L)))), class = "data.frame", row.names = 1L))
+hc_title(text = "Countries compared by population density and total area,
+ 2022.")
+hc_tooltip(
+  headerFormat = "",
+  pointFormat = "<span style=\"color:{point.color}\">●</span> <b> {point.name}</b><br/>Area (square km): <b>{point.y}</b><br/>Population density (people per square km): <b>{point.z}</b><br/>"
+)
+
+```
+
+### variwide
+
+```{r,eval = FALSE}
+
+hc_caption(text = "Column widths are proportional to GDP")
+hc_chart(type = "variwide")
+hc_legend(enabled = FALSE)
+hc_series(structure(list(name = "Labor Costs", data = list(structure(c("Norway", "Denmark", "Belgium", "Sweden", "France", "Netherlands", "Finland", "Germany", "Austria", "Ireland", "Italy", "United Kingdom", "Spain", "Greece", "Portugal", "Czech Republic", "Poland", "Romania", "50.2", "42", "39.2", "38", "35.6", "34.3", "33.2", "33", "32.7", "30.4", "27.8", "26.7", "21.3", "14.2", "13.7", "10.2", "8.6", "5.5", "335504", "277339", "421611", "462057", "2228857", "702641", "215615", "3144050", "349344", "275567", "1672438", "2366911", "1113851", "175887", "184933", "176564", "424269", "169578"), .Dim = c(18L, 3L))), dataLabels = structure(list(enabled = TRUE, format = "€{point.y:.0f}"), class = "data.frame", row.names = 1L), tooltip = structure(list(pointFormat = "Labor Costs: <b>€ {point.y}/h</b><br>GDP: <b>€ {point.z} million</b><br>"), class = "data.frame", row.names = 1L), colorByPoint = TRUE), class = "data.frame", row.names = 1L))
+hc_subtitle(text = "Source: <a href=\"http://ec.europa.eu/eurostat/web/labour-market/labour-costs/main-tables\">eurostat</a>")
+hc_title(text = "Labor Costs in Europe,
+ 2016")
+hc_xAxis(type = "category")
+
+```
+
+### venn-diagram
+
+```{r,eval = FALSE}
+
+hc_accessibility(point = structure(list(),
+  .Names = character(0)
+))
+hc_series(structure(list(type = "venn", name = "The Unattainable Triangle", data = list(structure(list(sets = list("Good", "Fast", "Cheap", c("Good", "Fast"), c("Good", "Cheap"), c("Fast", "Cheap"), c("Fast", "Cheap", "Good")), value = c(2L, 2L, 2L, 1L, 1L, 1L, 1L), name = c(NA, NA, NA, "More expensive", "Will take time to deliver", "Not the best quality", "They're dreaming")), class = "data.frame", row.names = c(NA, 7L)))), class = "data.frame", row.names = 1L))
+hc_title(text = "The Unattainable Triangle")
+
+```
