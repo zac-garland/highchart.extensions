@@ -1,9 +1,8 @@
-
 add_multi_drop <- function(hc, selectors, selected = NULL) {
   rand_id_begin <- paste(sample(letters, 3, replace = FALSE),
-    sample(letters, 4, replace = FALSE),
-    sample(letters, 3, replace = FALSE),
-    collapse = ""
+                         sample(letters, 4, replace = FALSE),
+                         sample(letters, 3, replace = FALSE),
+                         collapse = ""
   ) %>% stringr::str_remove_all(" ")
 
   list_opts <- purrr::map(setNames(selectors, selectors), ~ {
@@ -72,30 +71,12 @@ add_multi_drop <- function(hc, selectors, selected = NULL) {
   }}"
 
   highcharter::hc_chart(hc,
-    events = list(
-      load = highcharter::JS(glue::glue(js_fun))
-    )
+                        events = list(
+                          load = highcharter::JS(glue::glue(js_fun))
+                        )
   ) %>%
     htmltools::tagList(
       select_options, .
     ) %>%
     htmltools::browsable()
 }
-
-library(fpp3)
-
-us_employment %>%
-  janitor::clean_names() %>%
-  as_tibble() %>%
-  filter(!str_detect(title,":")) %>%
-  rename(value = employed) %>%
-  mutate(month = lubridate::as_date(month)) %>%
-  group_by(title) %>%
-  mutate(yoy = value/lag(value,12)-1,
-         `Three year comp` = value/lag(value,36)-1) %>%
-  gather(key,value,value:`Three year comp`) %>%
-  highcharter::hchart("line", highcharter::hcaes(month, value, name = title)) %>%
-  add_multi_drop(
-    selectors = c("title", "key"),
-    selected = c("Total Private", "Three year comp")
-  )
