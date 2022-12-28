@@ -17,7 +17,7 @@ editor_options:
 knitr::opts_chunk$set(cache = FALSE,message = FALSE,warning = FALSE)
 devtools::load_all(".")
 library(htmltools)
-
+tidyjs::use_tidyjs()
 ```
 
 
@@ -1889,10 +1889,10 @@ load_fn <- "function () {{
   
   setInterval(function () {{
       
-      console.log(dat);
+      //console.log(dat);
       var new_value = dot(dat, ar) + randn_bm();
       new_value = Math.round(1000 * new_value)/1000
-      console.log(new_value)
+      //console.log(new_value)
       dat.shift(); 
       dat.push(new_value);
       series.addPoint([new_value]);  
