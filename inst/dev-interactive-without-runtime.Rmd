@@ -26,7 +26,7 @@ library(fpp3) # for data example and tsibble date format
 A bit of background on why it presented itself. 
 
 - server vs. static
-- tableau vs. html
+- tableau vs. html (html doesn't have 'ease of use' parity - yet - which is what engineers help to resolve)
 
 # approaches available today
 
@@ -41,7 +41,9 @@ References to approaches available today / packages
 
 The first ugly attempt...
 
-I created my first dropdown in 2020 & ... looking back, I remember it being quite ugly. It was largely my first experience with html, javascript, and css so my end rmarkdown output looked something like the below
+I created my first dropdown in 2020 & ... looking back, I remember it being quite ugly. It was largely my first experience with html, javascript, and css so my end rmarkdown output looked something like the below. 
+
+It's often that speed of development can override 'feature soundness'. I wouldn't say this is necessarily a good thing. But - it's not necessarily a bad thing either. It forces you to focus on the bare bones minimum - that can then be developed further down the road. 
 
 ```r
 
@@ -83,6 +85,28 @@ selector.onchange = function(){
 ## the second
 
 An improved 2nd attempt
+
+I remember thinking, 'there's gotta be an easier way'. I was copying and pasting, manually creating all of the inputs, and duplicating a lot of code. 
+
+There's a joke that coders are 'lazy' in that they don't want to do something twice. In an odd way, it describes a paradigm of coding. Why would you repeat what you've already done vs. build on to it? 
+
+I took this very minimal starting point and started to build. 
+
+My goal was simple, how do I eliminate unnecessary code & duplications?
+
+The first order of business was to generate a random id to ensure that I didn't run into namespace collisions. This allows us to re-use the same logic without running into duplicate id's / definitions. 
+
+`highcharter` has a good function for this imho.
+
+```{r}
+highcharter:::random_id
+highcharter:::random_id()
+
+# I'd slightly modify it to append a letter at the start (sometimes it produces a number to start) to ensure there were no javascript errors 
+
+paste0(sample(letters,1),highcharter:::random_id())
+
+```
 
 
 ## considerations / drawbacks
