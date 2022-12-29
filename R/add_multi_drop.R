@@ -1,8 +1,8 @@
 add_multi_drop <- function(hc, selectors, selected = NULL) {
   rand_id_begin <- paste(sample(letters, 3, replace = FALSE),
-                         sample(letters, 4, replace = FALSE),
-                         sample(letters, 3, replace = FALSE),
-                         collapse = ""
+    sample(letters, 4, replace = FALSE),
+    sample(letters, 3, replace = FALSE),
+    collapse = ""
   ) %>% stringr::str_remove_all(" ")
 
   list_opts <- purrr::map(setNames(selectors, selectors), ~ {
@@ -59,8 +59,6 @@ add_multi_drop <- function(hc, selectors, selected = NULL) {
     init_data[index] = cloneData(series.data);
   }})
 
-  // init_data = cloneData(this_chart.options.series[0].data);
-
   {var_declaration}
 
   function updateChart(){{
@@ -83,9 +81,9 @@ add_multi_drop <- function(hc, selectors, selected = NULL) {
   }}"
 
   highcharter::hc_chart(hc,
-                        events = list(
-                          load = highcharter::JS(glue::glue(js_fun))
-                        )
+    events = list(
+      load = highcharter::JS(glue::glue(js_fun))
+    )
   ) %>%
     htmltools::tagList(
       select_options, .

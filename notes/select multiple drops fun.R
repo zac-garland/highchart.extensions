@@ -124,14 +124,16 @@ gapminder::gapminder %>%
     c("year","key")
   )
 
+
 gapminder::gapminder %>%
   mutate(iso_2 = countrycode::countrycode(country, "country.name", "iso2c")) %>%
+  filter(country != "Kuwait") %>%
   gather(key,value,lifeExp:gdpPercap) %>%
   hcmap(
     map = "custom/world",
     download_map_data = TRUE,
     joinBy = c("iso-a2", "iso_2"),
-    name = "LifeExp",
+    name = "",
     value = "value"
   ) %>%
   add_multi_drop(
