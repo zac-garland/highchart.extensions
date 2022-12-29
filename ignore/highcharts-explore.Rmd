@@ -41,10 +41,15 @@ highchart() %>%
   hc_add_series(
     type = "arcdiagram",
     data = list_parse(arc_data),
+    keys = list(c("from", "to", "weight")),
     linkWeight = 1L, centeredLinks = TRUE
   ) %>% 
-  hc_tooltip(enabled = TRUE,pointFormat = "{point.from}") %>% 
-  highcharter::hc_add_dependency("modules/arc-diagram.js") %>% 
+  # hc_tooltip(enabled = TRUE,pointFormat = "{point.from}") %>% 
+  htmltools::tagList(
+    htmltools::HTML('<script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.2/modules/arc-diagram.min.js" integrity="sha512-rwvL6lbNKx535xSX2Xf889a9O3JUDGgtQzkC+fvnuejlGz2gD9Vey2axDmCakgoFI7QDV6psryhSqvgMojuadA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>')
+  ) %>% 
+  htmltools::browsable()
+  # highcharter::hc_add_dependency("modules/arc-diagram.js") %>% 
   hc_add_dependency("modules/sankey.js")
 
   htmltools::tagList(
