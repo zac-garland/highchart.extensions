@@ -42,7 +42,7 @@ add_multi_drop <- function(hc, selectors, selected = NULL) {
 
   names(list_opts) %>%
     purrr::map_chr(~ {
-      glue::glue("obj.{.x} === select_{paste0(.x, rand_id_begin)}.value")
+      glue::glue("obj.{.x} == select_{paste0(.x, rand_id_begin)}.value")
     }) %>%
     paste(collapse = " & ") -> filter_declaration
 
@@ -55,16 +55,28 @@ add_multi_drop <- function(hc, selectors, selected = NULL) {
   js_fun <- "function(){{
   var this_chart = this;
   const cloneData = (sample) => {{ return JSON.parse(JSON.stringify(sample));}}
-  const init_data = cloneData(this_chart.options.series[0].data);
+  const init_data = [];
+  this_chart.options.series.map((series,index)=>{{
+    init_data[index] = cloneData(series.data);
+  }})
+
+  // init_data = cloneData(this_chart.options.series[0].data);
+
   {var_declaration}
 
   function updateChart(){{
-      new_data = init_data.filter(function(obj){{
+      init_data.map((series,index)=>{{
+      new_data = series.filter(function(obj){{
         return {filter_declaration}
-      }});
+        }});
+
       if(new_data.length>0){{
-        this_chart.series[0].setData(new_data);
+        this_chart.series[index].setData(new_data);
       }}
+
+      }})
+
+    this_chart.reflow();
 
    }}
   {onchg_events}
@@ -87,15 +99,42 @@ library(fpp3)
 us_employment %>%
   janitor::clean_names() %>%
   as_tibble() %>%
-  filter(!str_detect(title,":")) %>%
+  filter(str_detect(title,"Total")) %>%
+  # filter(!str_detect(title,":")) %>%
   rename(value = employed) %>%
   mutate(month = lubridate::as_date(month)) %>%
   group_by(title) %>%
   mutate(yoy = value/lag(value,12)-1,
          `Three year comp` = value/lag(value,36)-1) %>%
   gather(key,value,value:`Three year comp`) %>%
+  mutate(month = datetime_to_timestamp(month)) %>%
   highcharter::hchart("line", highcharter::hcaes(month, value, name = title)) %>%
+  hc_xAxis(type = "datetime") %>%
+  hc_add_theme(hc_theme_darkunica()) %>%
   add_multi_drop(
     selectors = c("title", "key"),
     selected = c("Total Private", "Three year comp")
+  )
+
+
+gapminder::gapminder %>%
+  gather(key,value,lifeExp:pop) %>%
+  hchart("scatter",hcaes(gdpPercap,value,group = continent,name = country)) %>%
+  add_multi_drop(
+    c("year","key")
+  )
+
+gapminder::gapminder %>%
+  mutate(iso_2 = countrycode::countrycode(country, "country.name", "iso2c")) %>%
+  gather(key,value,lifeExp:gdpPercap) %>%
+  hcmap(
+    map = "custom/world",
+    download_map_data = TRUE,
+    joinBy = c("iso-a2", "iso_2"),
+    name = "LifeExp",
+    value = "value"
+  ) %>%
+  add_multi_drop(
+    c("year","key"),
+    c("2012","lifeExp")
   )

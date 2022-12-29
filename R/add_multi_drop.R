@@ -41,7 +41,7 @@ add_multi_drop <- function(hc, selectors, selected = NULL) {
 
   names(list_opts) %>%
     purrr::map_chr(~ {
-      glue::glue("obj.{.x} === select_{paste0(.x, rand_id_begin)}.value")
+      glue::glue("obj.{.x} == select_{paste0(.x, rand_id_begin)}.value")
     }) %>%
     paste(collapse = " & ") -> filter_declaration
 
@@ -54,16 +54,28 @@ add_multi_drop <- function(hc, selectors, selected = NULL) {
   js_fun <- "function(){{
   var this_chart = this;
   const cloneData = (sample) => {{ return JSON.parse(JSON.stringify(sample));}}
-  const init_data = cloneData(this_chart.options.series[0].data);
+  const init_data = [];
+  this_chart.options.series.map((series,index)=>{{
+    init_data[index] = cloneData(series.data);
+  }})
+
+  // init_data = cloneData(this_chart.options.series[0].data);
+
   {var_declaration}
 
   function updateChart(){{
-      new_data = init_data.filter(function(obj){{
+      init_data.map((series,index)=>{{
+      new_data = series.filter(function(obj){{
         return {filter_declaration}
-      }});
+        }});
+
       if(new_data.length>0){{
-        this_chart.series[0].setData(new_data);
+        this_chart.series[index].setData(new_data);
       }}
+
+      }})
+
+    this_chart.reflow();
 
    }}
   {onchg_events}
