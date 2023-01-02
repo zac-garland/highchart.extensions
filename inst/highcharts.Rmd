@@ -19,16 +19,89 @@ knitr::opts_chunk$set(cache = FALSE, message = FALSE, warning = FALSE)
 devtools::load_all(".")
 library(htmltools)
 library(fpp3)
-tidyjs::use_tidyjs()
+
+thm <- hc_theme(
+  colors = rev(c(
+    "#003f5c", "#2f4b7c", "#665191", "#a05195", "#d45087", "#f95d6a",
+    "#ff7c43", "#ffa600"
+  )),style = list(fontSize = "1.2rem"), chart = list(
+    backgroundColor = "var(--page-background)"
+  ), xAxis = list(
+    labels = list(style = list(color = "var(--text-color)")),
+    gridLineDashStyle = "Dash",
+    gridLineWidth = 1, gridLineColor = "var(--code-block-background)", lineColor = "var(--text-color)",
+    minorGridLineColor = "var(--text-color)", tickColor = "var(--text-color)", tickWidth = 1,
+    title = list(style = list(color = "var(--text-color)"))
+  ), yAxis = list(
+    labels = list(style = list(color = "var(--text-color)")),
+    gridLineDashStyle = "Dash",
+    gridLineWidth = 1, gridLineColor = "var(--code-block-background)", lineColor = "var(--text-color)",
+    minorGridLineColor = "var(--text-color)", tickColor = "var(--text-color)", tickWidth = 1,
+    title = list(style = list(color = "var(--text-color)"))
+  ), legendBackgroundColor = "var(--page-background)",
+  background2 = "var(--page-background)", dataLabelsColor = "var(--text-color)", textColor = "var(--text-color)",
+  contrastTextColor = "var(--text-color)", maskColor = "rgba(255,255,255,0.3)",
+  title = list(style = list(color = "var(--text-color)")), subtitle = list(
+    style = list(color = "var(--text-color)")
+  ), legend = list(
+    itemStyle = list(
+      color = "var(--text-color)"
+    ), itemHoverStyle = list(color = "var(--text-color)"),
+    itemHiddenStyle = list(color = "var(--text-color)")
+  )
+)
+
+thm <- hc_theme_merge(
+  hc_theme_darkunica(),
+  thm
+)
+
+options(
+  highcharter.theme = thm,
+  highcharter.color_palette = rev(c(
+    "#003f5c", "#2f4b7c", "#665191", "#a05195", "#d45087", "#f95d6a",
+    "#ff7c43", "#ffa600"
+  ))
+)
+
+
+
+
 ```
 
 The goal of this document is to provide a fairly comprehensive translation of highcharts.js plots within R. It attempts to combine references found on the official `highcharter` website, in addition to filling in gaps with `highcharts.js` examples, and other plots. 
 
 
+It also provides a small extension to the `highcharter` library which allows anyone to create runtime like toggles within an existing `highcharter` plot definition within a statically rendered document (like an rmarkdown html output). 
+
+```{r}
+gapminder::gapminder |>
+  mutate(iso_2 = countrycode::countrycode(country, "country.name", "iso2c")) |>
+  filter(country != "Kuwait") |>
+  gather(key, value, lifeExp:gdpPercap) |>
+  hcmap(
+    map = "custom/world",
+    download_map_data = TRUE,
+    joinBy = c("iso-a2", "iso_2"),
+    name = "",
+    nullColor = "transparent",
+    borderColor = "black",
+    value = "value"
+  ) |>
+  hc_colorAxis(minColor = "#e6ebf5",maxColor = getOption("highcharter.color_palette") %>% tail(1)) %>% 
+  hc_title(text = "Gapminder Map Toggles") %>% 
+  # hc_add_theme()
+  add_multi_drop(
+    c("year", "key"),
+    c("2002", "lifeExp")
+  )
+```
+
+
 This page is heavily influenced by Joshua Kunst's blog, documentation, and issue responses.
 
 
-# Theme, Layout, & Toggles
+# Theme
 
 ## Theme
 
@@ -37,7 +110,7 @@ thm <- hc_theme(
   colors = rev(c(
     "#003f5c", "#2f4b7c", "#665191", "#a05195", "#d45087", "#f95d6a",
     "#ff7c43", "#ffa600"
-  )), chart = list(
+  )),style = list(fontSize = "1.2rem"), chart = list(
     backgroundColor = "var(--page-background)"
   ), xAxis = list(
     labels = list(style = list(color = "var(--text-color)")),
@@ -81,10 +154,45 @@ options(
 highcharter::highcharts_demo()
 ```
 
+# Extending highcharter
 
 ## Creating Multiple Toggles
 
-```r
+One of the most difficult tasks I've ran into during my career was the need to create runtime interactivity... without runtime. In other words, finding a way to create the ability to toggle / filter / and select different series, within a statically rendered document. 
+
+Although I've approached this problem in multiple ways (many of them containing a lot of javascript code / very manual events and definitions), the below is the most seamless solution that I've come up with to date. It seems to work with multiple plot types, respects grouped data, and it allows you to go from a standard highcharts plot, to a 'dashboard' like plot with one line of code.
+
+This makes these types of plots available to anyone that can define a highcharts plot :) - & there are a good amount of examples of those below. 
+
+
+```{r}
+
+tidy_employment_data <- fpp3::us_employment |>
+  janitor::clean_names() |>
+  as_tibble() |>
+  filter(!str_detect(title, ":")) |>
+  rename(value = employed) |>
+  mutate(month = lubridate::as_date(month)) |>
+  group_by(title) |>
+  mutate(
+    yoy = value / lag(value, 12) - 1,
+    `Three year comp` = value / lag(value, 36) - 1
+  ) |>
+  gather(key, value, value:`Three year comp`)
+
+tidy_employment_data |>
+  mutate(month = datetime_to_timestamp(month)) |> # for highcharts date format
+  highcharter::hchart("line", highcharter::hcaes(month, value, name = title)) |>
+  hc_xAxis(type = "datetime") |>
+  add_multi_drop(
+    selectors = c("title", "key"),
+    selected = c("Total Private", "Three year comp")
+  )
+```
+
+## the underlying function
+
+```{r,eval = FALSE,class.source = 'fold-show'}
 # https://github.com/zac-garland/highchart.extensions/blob/master/R/add_multi_drop.R
 add_multi_drop <- function(hc, selectors, selected = NULL) {
   # first we create a random id to ensure that if used multiple times, each selector / chart combo has a unique id
@@ -202,32 +310,8 @@ js_fun <- "function(){{
 
 
 
-```{r}
 
-tidy_employment_data <- fpp3::us_employment |>
-  janitor::clean_names() |>
-  as_tibble() |>
-  filter(!str_detect(title, ":")) |>
-  rename(value = employed) |>
-  mutate(month = lubridate::as_date(month)) |>
-  group_by(title) |>
-  mutate(
-    yoy = value / lag(value, 12) - 1,
-    `Three year comp` = value / lag(value, 36) - 1
-  ) |>
-  gather(key, value, value:`Three year comp`)
-
-tidy_employment_data |>
-  mutate(month = datetime_to_timestamp(month)) |> # for highcharts date format
-  highcharter::hchart("line", highcharter::hcaes(month, value, name = title)) |>
-  hc_xAxis(type = "datetime") |>
-  add_multi_drop(
-    selectors = c("title", "key"),
-    selected = c("Total Private", "Three year comp")
-  )
-```
-
-### grouped data
+## grouped data
 
 ```{r}
 
@@ -240,113 +324,6 @@ gapminder::gapminder |>
   )
 ```
 
-
-### changing map variables / filtering
-
-```{r}
-
-gapminder::gapminder |>
-  mutate(iso_2 = countrycode::countrycode(country, "country.name", "iso2c")) |>
-  filter(country != "Kuwait") |>
-  gather(key, value, lifeExp:gdpPercap) |>
-  hcmap(
-    map = "custom/world",
-    download_map_data = TRUE,
-    joinBy = c("iso-a2", "iso_2"),
-    name = "",
-    nullColor = "transparent",
-    borderColor = "black",
-    value = "value"
-  ) |>
-  hc_colorAxis(minColor = "#e6ebf5",maxColor = getOption("highcharter.color_palette") %>% tail(1)) %>% 
-  # hc_add_theme()
-  add_multi_drop(
-    c("year", "key"),
-    c("2002", "lifeExp")
-  )
-```
-
-
-
-
-## legend and last value
-
-```{r}
-economics_long %>%
-  mutate(date = datetime_to_timestamp(date)) %>%
-  highcharter::hchart("area", hcaes(date, value01, group = variable)) %>%
-  highcharter::hc_xAxis(type = "datetime") %>%
-  hc_plotOptions(area = list(stacking = "normal")) %>%
-  hc_legend(layout = "proximate", align = "right", labelFormatter = JS("function () {
-           ydat = this.yData;
-            return this.name + ' ' + ydat[ydat.length-1].toFixed(2);
-        }"))
-```
-
-
-
-## Plot Grid
-
-
-
-```{r}
-highchart() %>%
-  hc_xAxis_multiples(structure(list(
-    list(width = "50%"),
-    list(opposite = FALSE, width = "45%", left = "55%")
-  ), class = "hc_axis_list")) %>%
-  hc_yAxis_multiples(structure(list(
-    list(width = "32.68%", height = "100%"),
-    list(opposite = TRUE, width = "65.36%", left = "32.68%", height = "49.505%", top = "0%"),
-    list(opposite = TRUE, width = "65.36%", left = "32.68%", height = "49.505%", top = "50.495%")
-  ), class = "hc_axis_list")) %>%
-  hc_add_series(data = c(1, 3, 2), xAxis = 0, yAxis = 0) %>%
-  hc_add_series(data = c(20, 40, 10), type = "area", xAxis = 1, yAxis = 1) %>%
-  hc_add_series(data = c(200, 400, 500), xAxis = 1, yAxis = 2) %>%
-  hc_add_series(data = c(500, 300, 400), type = "areaspline", xAxis = 1, yAxis = 2)
-
-create_yaxis_horizontal <- function(naxis = 2, heights = 1, sep = 0.01, offset = 0, turnopposite = TRUE,
-                                    ...) {
-  pcnt <- function(x) paste0(x * 100, "%")
-  heights <- rep(heights, length = naxis)
-  heights <- (heights / sum(heights)) %>%
-    map(function(x) {
-      c(
-        x,
-        sep
-      )
-    }) %>%
-    unlist() %>%
-    head(-1) %>%
-    {
-      . / sum(.)
-    } %>%
-    round(5)
-  tops <- cumsum(c(0, head(heights, -1)))
-  tops <- pcnt(tops)
-  heights <- pcnt(heights)
-  dfaxis <- tibble(width = heights, left = tops, offset = offset)
-  dfaxis <- dfaxis %>% dplyr::filter(seq_len(nrow(dfaxis)) %% 2 !=
-    0)
-  if (turnopposite) {
-    ops <- rep_len(c(FALSE, TRUE), length.out = nrow(dfaxis))
-    dfaxis <- dfaxis %>% mutate(opposite = ops)
-  }
-  dfaxis <- bind_cols(dfaxis, tibble(nid = seq(naxis), ...))
-  axles <- list_parse(dfaxis)
-  class(axles) <- "hc_axis_list"
-  axles
-}
-
-
-highchart() %>%
-  hc_xAxis_multiples(create_yaxis_horizontal(naxis = 3, turnopposite = FALSE)) %>%
-  hc_yAxis_multiples(create_yaxis_horizontal(naxis = 3, lineWidth = 2, title = list(text = NULL), turnopposite = FALSE, opposite = c(FALSE, TRUE, TRUE))) %>%
-  hc_add_series(data = c(1, 3, 2), xAxis = 0, yAxis = 0) %>%
-  hc_add_series(data = c(20, 40, 10), type = "area", xAxis = 1, yAxis = 1) %>%
-  hc_add_series(data = c(200, 400, 500), xAxis = 2, yAxis = 2) %>%
-  hc_add_series(data = c(500, 300, 400), type = "areaspline", xAxis = 2, yAxis = 2)
-```
 
 
 
@@ -398,7 +375,14 @@ The area series type.
 
 ```{r}
 economics_long %>%
-  hchart("area", hcaes(date, value01, group = variable))
+  mutate(date = datetime_to_timestamp(date)) %>%
+  highcharter::hchart("area", hcaes(date, value01, group = variable)) %>%
+  highcharter::hc_xAxis(type = "datetime") %>%
+  hc_plotOptions(area = list(stacking = "normal")) %>%
+  hc_legend(layout = "proximate", align = "right", labelFormatter = JS("function () {
+           ydat = this.yData;
+            return this.name + ' ' + ydat[ydat.length-1].toFixed(2);
+        }"))
 ```
 
 
@@ -818,14 +802,6 @@ highchart() %>%
 
 The dumbbell series is a cartesian series with higher and lower values for each point along an X axis, connected with a line between the values.
 
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/dumbbell/" target="_blank">dumbbell</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-dumbbell/styled-mode-dumbbell/" target="_blank">styled-mode-dumbbell</a></div>
-</div>
-
-``` 
 
 
 
@@ -1007,15 +983,6 @@ economics_long %>%
 ```
 
 
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/heatmap/" target="_blank">heatmap</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/heatmap-canvas/" target="_blank">heatmap-canvas</a></div>
-</div>
-
-``` 
-
 
 
 
@@ -1097,17 +1064,6 @@ hchart(
   hc_title(text = "Item chart with different layout") %>%
   hc_legend(labelFormat = '{name} <span style="opacity: 0.4">{y}</span>')
 ```
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/parliament-chart" target="_blank">parliament-chart</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-item/rectangular" target="_blank">rectangular</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-item/symbols" target="_blank">symbols</a></div>
-</div>
-
-``` 
 
 
 
@@ -2415,275 +2371,68 @@ hchart(
 
 ``` 
 
-```{r}
-# fix for strange headers after html block
-div("&nbsp")
-```
+
+## grid
 
 
-
-# Jbkunst references
-
-
-
-## Colored Area and Colored Line
 
 ```{r}
+highchart() %>%
+  hc_xAxis_multiples(structure(list(
+    list(width = "50%"),
+    list(opposite = FALSE, width = "45%", left = "55%")
+  ), class = "hc_axis_list")) %>%
+  hc_yAxis_multiples(structure(list(
+    list(width = "32.68%", height = "100%"),
+    list(opposite = TRUE, width = "65.36%", left = "32.68%", height = "49.505%", top = "0%"),
+    list(opposite = TRUE, width = "65.36%", left = "32.68%", height = "49.505%", top = "50.495%")
+  ), class = "hc_axis_list")) %>%
+  hc_add_series(data = c(1, 3, 2), xAxis = 0, yAxis = 0) %>%
+  hc_add_series(data = c(20, 40, 10), type = "area", xAxis = 1, yAxis = 1) %>%
+  hc_add_series(data = c(200, 400, 500), xAxis = 1, yAxis = 2) %>%
+  hc_add_series(data = c(500, 300, 400), type = "areaspline", xAxis = 1, yAxis = 2)
 
-library(dplyr)
+create_yaxis_horizontal <- function(naxis = 2, heights = 1, sep = 0.01, offset = 0, turnopposite = TRUE,
+                                    ...) {
+  pcnt <- function(x) paste0(x * 100, "%")
+  heights <- rep(heights, length = naxis)
+  heights <- (heights / sum(heights)) %>%
+    map(function(x) {
+      c(
+        x,
+        sep
+      )
+    }) %>%
+    unlist() %>%
+    head(-1) %>%
+    {
+      . / sum(.)
+    } %>%
+    round(5)
+  tops <- cumsum(c(0, head(heights, -1)))
+  tops <- pcnt(tops)
+  heights <- pcnt(heights)
+  dfaxis <- tibble(width = heights, left = tops, offset = offset)
+  dfaxis <- dfaxis %>% dplyr::filter(seq_len(nrow(dfaxis)) %% 2 !=
+    0)
+  if (turnopposite) {
+    ops <- rep_len(c(FALSE, TRUE), length.out = nrow(dfaxis))
+    dfaxis <- dfaxis %>% mutate(opposite = ops)
+  }
+  dfaxis <- bind_cols(dfaxis, tibble(nid = seq(naxis), ...))
+  axles <- list_parse(dfaxis)
+  class(axles) <- "hc_axis_list"
+  axles
+}
 
-set.seed(123)
-n <- 200
-colors <- sample(viridisLite::cividis(5, end = .9))
-
-df <- tibble(
-  x = 1:n,
-  y = abs(arima.sim(n = n, model = list(ar = c(0.9)))) + 2,
-  y2 = 10 + y,
-  col = rep(colors, each = n / 10, length.out = n)
-)
-
-hchart(df, "coloredarea", hcaes(x, y, segmentColor = col)) %>%
-  hc_add_series(df, "coloredline", hcaes(x, y2, segmentColor = col)) %>%
-  hc_add_dependency("plugins/multicolor_series.js")
-```
-
-## Scatter and Model Confidence Interval
-
-```{r}
-
-library(broom)
-
-modlss <- loess(dist ~ speed, data = cars)
-
-fit <- arrange(augment(modlss), speed) %>%
-  mutate(.se = predict(modlss, se = TRUE)$se.fit)
-
-# head(fit)
-
-hc <- hchart(
-  cars,
-  type = "scatter",
-  hcaes(x = speed, y = dist),
-  name = "Speed and Stopping Distances of Cars",
-  showInLegend = TRUE
-)
-
-
-qtint <- qt(0.975, predict(modlss, se = TRUE)$df)
-
-hc %>%
-  hc_add_series(
-    fit,
-    type = "spline",
-    hcaes(x = speed, y = .fitted),
-    name = "Fit",
-    id = "fit", ## this is for link the arearange series to this one and have one legend
-    lineWidth = 1,
-    showInLegend = TRUE
-  ) %>%
-  hc_add_series(
-    fit,
-    type = "arearange",
-    name = "SE",
-    hcaes(x = speed, low = .fitted - qtint * .se, high = .fitted + qtint * .se),
-    linkedTo = "fit", ## here we link the legends in one.
-    showInLegend = FALSE,
-    color = hex_to_rgba("gray", 0.2), ## put a semi transparent color
-    zIndex = -3 ## this is for put the series in a back so the points are showed first
-  )
-```
-
-## mixed plot types
-
-```{r}
-data(favorite_bars)
-data(favorite_pies)
 
 highchart() %>%
-  ## Data
-  hc_add_series(
-    favorite_pies,
-    "column", hcaes(
-      x = pie, y = percent
-    ),
-    name = "Pie"
-  ) %>%
-  hc_add_series(
-    favorite_bars, "pie", hcaes(
-      name = bar, y = percent
-    ),
-    name = "Bars"
-  ) %>%
-  ## Options for each type of series
-  hc_plotOptions(
-    series = list(
-      showInLegend = FALSE, pointFormat = "{point.y}%", colorByPoint = TRUE
-    ), pie = list(
-      center = c("30%", "10%"), size = 120, dataLabels = list(enabled = FALSE)
-    )
-  ) %>%
-  ## Axis
-  hc_yAxis(
-    title = list(text = "percentage of tastiness"), labels = list(format = "{value}%"),
-    max = 100
-  ) %>%
-  hc_xAxis(
-    categories = favorite_pies$pie
-  ) %>%
-  ## Titles, subtitle, caption and credits
-  hc_title(
-    text = "How I Met Your Mother: Pie Chart Bar Graph"
-  ) %>%
-  hc_subtitle(
-    text = "This is a bar graph describing my favorite pies
-    including a pie chart describing my favorite bars"
-  ) %>%
-  hc_caption(
-    text = "The values represented are in percentage of tastiness and awesomeness."
-  ) %>%
-  hc_credits(
-    enabled = TRUE, text = "Source: HIMYM", href = "https://www.youtube.com/watch?v=f_J8QU1m0Ng", style = list(fontSize = "12px")
-  ) %>%
-  hc_size(
-    height = 600
-  )
-
-```
-
-
-## simulating arima
-
-```{r}
-
-library(highcharter)
-library(stringr)
-sim_ar_hc <- function(ar = c(0.3, 0.2), time = 1) {
-
-  # the first values of the model
-  ts <- as.vector(arima.sim(model = list(ar = ar), n = 10))
-  ts <- round(ts, 3)
-  ts
-
-  load_fn <- "function () {{
-	dot = (a, b) => a.map((x, i) => a[i] * b[i]).reduce((m, n) => m + n);
-  function randn_bm() {{
-  	var u = 0, v = 0;
-    while(u === 0) u = Math.random(); //Converting [0,1) to (0,1)
-    while(v === 0) v = Math.random();
-    return Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
-   }}
-
-	var dat = [{ data }];
-  var ar = [{ ar }];
-  dat = dat.slice(-ar.length);
-
-  // set up the updating of the chart each second
-  var series = this.series[0];
-
-  setInterval(function () {{
-
-      //console.log(dat);
-      var new_value = dot(dat, ar) + randn_bm();
-      new_value = Math.round(1000 * new_value)/1000
-      //console.log(new_value)
-      dat.shift();
-      dat.push(new_value);
-      series.addPoint([new_value]);
-
-      //if (series.data.length < 500) {{
-      //  series.addPoint([new_value], true, false);
-      //}} else {{
-      //  series.addPoint([new_value], true, true);
-      //}}
-
-  }}, { time });
-
-}}"
-
-  load_fn_glued <- str_glue(
-    load_fn,
-    data = str_c(ts, collapse = ","),
-    ar = str_c(ar, collapse = ","),
-    time = time * 1000
-  )
-
-  tick_post_fn <- "function(min,max){
-    var data = this.chart.yAxis[0].series[0].processedYData;
-    //last point
-    return [Math.round(1000 * data[data.length-1])/1000];
-  }"
-
-  rm_poinst_fn <- "function () {
-    for (var i = 1; i <= 500; i++) {
-      if (this.series[0].data.length) {
-        this.series[0].data[0].remove();
-      }
-    }
-  }"
-
-  formula <- purrr::map2(ar, seq_along(ar), function(par, t) {
-    if (par > 0 & t > 1) {
-      par <- str_c("+ ", par)
-    }
-
-    htmltools::tagList(par, "×", "X", tags$sub(stringr::str_glue("t - { i }", i = t)))
-  })
-
-  formula <- purrr::reduce(formula, htmltools::tagList)
-
-  formula <- str_c("X", tags$sub("t") %>% as.character(), " = ", formula %>% as.character(), " + &epsilon;", tags$sub("t") %>% as.character())
-
-  hc <- highchart() %>%
-    hc_add_series(data = ts, name = "Process") %>%
-    hc_chart(
-      events = list(load = JS(load_fn_glued)),
-      animation = list(duration = time * 1000 / 2)
-    ) %>%
-    hc_title(text = "Autoregressive process") %>%
-    hc_subtitle(text = formula, useHTML = TRUE) %>%
-    hc_plotOptions(series = list(marker = list(enabled = FALSE))) %>%
-    hc_tooltip(valueDecimals = 3) %>%
-    hc_xAxis(width = "95%") %>%
-    hc_exporting(
-      enabled = TRUE,
-      buttons = list(
-        list(
-          text = "Remove last 500 values",
-          onclick = JS(rm_poinst_fn),
-          theme = list(stroke = "silver")
-        )
-      )
-    ) %>%
-    hc_yAxis_multiples(
-      # default axis
-      list(
-        title = list(text = ""),
-        plotLines = list(
-          list(value = 0, width = 2, color = "#AAA", zIndex = 1)
-        )
-      ),
-      # opposite axis
-      list(
-        title = list(text = ""),
-        linkedTo = 0,
-        opposite = TRUE,
-        gridLineWidth = 0,
-        tickPositioner = JS(tick_post_fn)
-      )
-    ) %>%
-    hc_navigator(
-      enabled = TRUE,
-      series = list(type = "line"),
-      xAxis = list(labels = list(enabled = FALSE), width = "95%")
-    )
-
-  hc
-}
-
-
-
-sim_ar_hc()
+  hc_xAxis_multiples(create_yaxis_horizontal(naxis = 3, turnopposite = FALSE)) %>%
+  hc_yAxis_multiples(create_yaxis_horizontal(naxis = 3, lineWidth = 2, title = list(text = NULL), turnopposite = FALSE, opposite = c(FALSE, TRUE, TRUE))) %>%
+  hc_add_series(data = c(1, 3, 2), xAxis = 0, yAxis = 0) %>%
+  hc_add_series(data = c(20, 40, 10), type = "area", xAxis = 1, yAxis = 1) %>%
+  hc_add_series(data = c(200, 400, 500), xAxis = 2, yAxis = 2) %>%
+  hc_add_series(data = c(500, 300, 400), type = "areaspline", xAxis = 2, yAxis = 2)
 ```
 
 
@@ -2691,53 +2440,13 @@ sim_ar_hc()
 
 
 
-```{css}
 
 
-.Wrap {
-    max-width: calc(max(1180px,85%)) !important;
-}
-
-
-
-```
-
-
-```{js}
-function resizedw(){
-    $(".highchart, .highcharts-container, .highcharts-container > svg").each(function(){
-    
-      var chartHeight = $(this).height(), 
-          chartWidth = $(this).find("rect").width(), 
-          mainWidth = $(".Content").width(), 
-          newHeight = Math.round((chartHeight / chartWidth)*mainWidth);
-         // "height": Math.round(((9 / 16) * mainWidth)) 
-      //console.log(chartHeight,chartWidth,newHeight);
-       
-      $(this).css({"width":"100%","max-width": "100%"});
-  })
-}
-
-var doit;
-window.onresize = function(){
-  clearTimeout(doit);
-  doit = setTimeout(resizedw, 1000);
-};
-
-window.dispatchEvent(new Event('resize'));
-
-
-
-
-
-```
-
-
-# Charts with conflicts
+## charts with conflicts
 
 These charts seem to run into javascript conflict errors when included with other highcharts plots, but otherwise are functional code. 
 
-## arcdiagram
+### arcdiagram
 
 Arc diagram series is a chart drawing style in which the vertices of the chart are positioned along a line on the Euclidean plane and the edges are drawn as a semicircle in one of the two half-planes delimited by the line, or as smooth curves formed by sequences of semicircles.
 
@@ -2794,7 +2503,7 @@ highchartzero() %>%
 
 ``` 
 
-## bellcurve
+### bellcurve
 
 A bell curve is an areaspline series which represents the probability density function of the normal distribution. It calculates mean and standard deviation of the base series data and plots the curve according to the calculated parameters.
 
@@ -2839,7 +2548,7 @@ c(
 
 
 
-## networkgraph
+### networkgraph
 
 A networkgraph is a type of relationship chart, where connnections(links) attracts nodes (points) and other nodes repulse each other.
 
@@ -2867,7 +2576,7 @@ highchartzero() %>%
 
 ``` 
 
-## pareto
+### pareto
 
 A pareto diagram is a type of chart that contains both bars and a linegraph, where individual values are represented in descending order by bars, and the cumulative total is represented by the line.
 
@@ -2898,7 +2607,7 @@ highchartzero() %>%
 
 
 
-## variablepie
+### variablepie
 
 A variable pie series is a two dimensional series type, where each point renders an Y and Z value.  Each point is drawn as a pie slice where the size (arc) of the slice relates to the Y value and the radius of pie slice relates to the Z value.
 
@@ -2918,7 +2627,7 @@ highchartzero() %>%
 
 ``` 
 
-## variwide
+### variwide
 
 A variwide chart (related to marimekko chart) is a column chart with a variable width expressing a third dimension.
 
@@ -2942,5 +2651,49 @@ highchartzero() %>%
 
 
 
+```{css}
 
+
+
+
+
+
+```
+
+.Wrap {
+    max-width: calc(max(1180px,85%)) !important;
+}
+
+```{js}
+function resizedw(){
+    $(".highchart, .highcharts-container, .highcharts-container > svg").each(function(){
+    
+      var chartHeight = $(this).height(), 
+          chartWidth = $(this).find("rect").width(), 
+          mainWidth = $(".Content").width(), 
+          newHeight = Math.round(((chartHeight*.85) / chartWidth)*mainWidth);
+         // "height": Math.round(((9 / 16) * mainWidth)) 
+      //console.log(chartHeight,chartWidth,newHeight);
+       
+      $(this).css({"width":"100%","max-width": "100%"});
+  })
+}
+
+var doit;
+window.onresize = function(){
+  clearTimeout(doit);
+  doit = setTimeout(resizedw, 1000);
+};
+
+window.onload = function(){
+  window.dispatchEvent(new Event('resize'));
+}
+
+
+
+
+
+
+
+```
 
