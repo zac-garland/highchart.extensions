@@ -82,6 +82,8 @@ selector.onchange = function(){
 
 ```
 
+### considerations / drawbacks
+
 ## the second
 
 An improved 2nd attempt
@@ -109,9 +111,11 @@ paste0(sample(letters,1),highcharter:::random_id())
 ```
 
 
-## considerations / drawbacks
+
 
 Speed / render / redraw
+
+### considerations / drawbacks
 
 ## third attempt
 

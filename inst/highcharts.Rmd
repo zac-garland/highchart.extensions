@@ -1,5 +1,6 @@
 ---
-title: ""
+title: "Highcharts Cookbook (R)"
+author: "Zac Garland"
 date: "`r Sys.Date()`"
 output:
   rmdformats::downcute:
@@ -14,47 +15,53 @@ editor_options:
 
 ```{r setup, include=FALSE,echo = FALSE}
 ### Global options
-knitr::opts_chunk$set(cache = FALSE,message = FALSE,warning = FALSE)
+knitr::opts_chunk$set(cache = FALSE, message = FALSE, warning = FALSE)
 devtools::load_all(".")
 library(htmltools)
+library(fpp3)
 tidyjs::use_tidyjs()
 ```
+
+The goal of this document is to provide a fairly comprehensive translation of highcharts.js plots within R. It attempts to combine references found on the official `highcharter` website, in addition to filling in gaps with `highcharts.js` examples, and other plots. 
 
 
 This page is heavily influenced by Joshua Kunst's blog, documentation, and issue responses.
 
 
+# Theme, Layout, & Toggles
+
 ## Theme
 
 ```{r}
 thm <- hc_theme(
-      colors = c("#7cb5ec", "#434348", "#90ed7d", "#f7a35c", "#8085e9", "#f15c80", 
-"#e4d354", "#2b908f", "#f45b5b", "#91e8e1"), chart = list(
-      backgroundColor = "var(--page-background)"
-    ), xAxis = list(
-      labels = list(style = list(color = "var(--text-color)")),
-      gridLineDashStyle = "Dash",
-      gridLineWidth = 1, gridLineColor = "var(--code-block-background)", lineColor = "var(--text-color)",
-      minorGridLineColor = "var(--text-color)", tickColor = "var(--text-color)", tickWidth = 1,
-      title = list(style = list(color = "var(--text-color)"))
-    ), yAxis = list(
-      labels = list(style = list(color = "var(--text-color)")),
-      gridLineDashStyle = "Dash",
-      gridLineWidth = 1, gridLineColor = "var(--code-block-background)", lineColor = "var(--text-color)",
-      minorGridLineColor = "var(--text-color)", tickColor = "var(--text-color)", tickWidth = 1,
-      title = list(style = list(color = "var(--text-color)"))    
-      ), legendBackgroundColor = "var(--page-background)",
-    background2 = "var(--page-background)", dataLabelsColor = "var(--text-color)", textColor = "var(--text-color)",
-    contrastTextColor = "var(--text-color)", maskColor = "rgba(255,255,255,0.3)",
-    title = list(style = list(color = "var(--text-color)")), subtitle = list(
-      style = list(color = "var(--text-color)")
-    ), legend = list(
-      itemStyle = list(
-        color = "var(--text-color)"
-      ), itemHoverStyle = list(color = "var(--text-color)"),
-      itemHiddenStyle = list(color = "var(--text-color)")
-    )
-
+  colors = rev(c(
+    "#003f5c", "#2f4b7c", "#665191", "#a05195", "#d45087", "#f95d6a",
+    "#ff7c43", "#ffa600"
+  )), chart = list(
+    backgroundColor = "var(--page-background)"
+  ), xAxis = list(
+    labels = list(style = list(color = "var(--text-color)")),
+    gridLineDashStyle = "Dash",
+    gridLineWidth = 1, gridLineColor = "var(--code-block-background)", lineColor = "var(--text-color)",
+    minorGridLineColor = "var(--text-color)", tickColor = "var(--text-color)", tickWidth = 1,
+    title = list(style = list(color = "var(--text-color)"))
+  ), yAxis = list(
+    labels = list(style = list(color = "var(--text-color)")),
+    gridLineDashStyle = "Dash",
+    gridLineWidth = 1, gridLineColor = "var(--code-block-background)", lineColor = "var(--text-color)",
+    minorGridLineColor = "var(--text-color)", tickColor = "var(--text-color)", tickWidth = 1,
+    title = list(style = list(color = "var(--text-color)"))
+  ), legendBackgroundColor = "var(--page-background)",
+  background2 = "var(--page-background)", dataLabelsColor = "var(--text-color)", textColor = "var(--text-color)",
+  contrastTextColor = "var(--text-color)", maskColor = "rgba(255,255,255,0.3)",
+  title = list(style = list(color = "var(--text-color)")), subtitle = list(
+    style = list(color = "var(--text-color)")
+  ), legend = list(
+    itemStyle = list(
+      color = "var(--text-color)"
+    ), itemHoverStyle = list(color = "var(--text-color)"),
+    itemHiddenStyle = list(color = "var(--text-color)")
+  )
 )
 
 thm <- hc_theme_merge(
@@ -62,36 +69,265 @@ thm <- hc_theme_merge(
   thm
 )
 
-options(highcharter.theme = thm)
+options(
+  highcharter.theme = thm,
+  highcharter.color_palette = rev(c(
+    "#003f5c", "#2f4b7c", "#665191", "#a05195", "#d45087", "#f95d6a",
+    "#ff7c43", "#ffa600"
+  ))
+)
 
 
 highcharter::highcharts_demo()
 ```
 
 
+## Creating Multiple Toggles
+
+```r
+# https://github.com/zac-garland/highchart.extensions/blob/master/R/add_multi_drop.R
+add_multi_drop <- function(hc, selectors, selected = NULL) {
+  # first we create a random id to ensure that if used multiple times, each selector / chart combo has a unique id
+  rand_id_begin <- paste(sample(letters, 3, replace = FALSE),
+    sample(letters, 4, replace = FALSE),
+    sample(letters, 3, replace = FALSE),
+    collapse = ""
+  ) |> stringr::str_remove_all(" ")
+
+  # next we generate the potential list options available in the chart (to ensure that we aren't passing in multiple data sets or trying to attach the data again to the web document)
+  list_opts <- purrr::map(setNames(selectors, selectors), ~ {
+    select_name <- .x
+    hc$x$hc_opts$series |>
+      purrr::map(~ {
+        purrr::map(purrr::pluck(.x, "data"), ~ {
+          purrr::pluck(.x, select_name)
+        }) |>
+          unlist()
+      }) |>
+      unlist() |>
+      unique()
+  })
+
+  # generate the select html input elements with their corresponding options
+  select_options <- list_opts |>
+    purrr::imap(~ {
+      htmltools::tags$select(
+        style = "display:inline-block",
+        id = paste0(.y, rand_id_begin),
+        purrr::map(.x, ~ {
+          if ((!is.null(selected) & .x %in% selected)) {
+            htmltools::tags$option(value = ., ., `selected` = TRUE)
+          } else {
+            htmltools::tags$option(value = ., .)
+          }
+        })
+      )
+    })
+
+  # generate variable declaration statement in javascript using R string interpolation (comparable to es7 `this var: ${var}`)
+  names(list_opts) |>
+    purrr::map_chr(~ {
+      glue::glue("var select_{paste0(.x, rand_id_begin)} = document.getElementById('{paste0(.x, rand_id_begin)}');")
+    }) |>
+    paste(collapse = "") -> var_declaration
+
+  # generate shared javascript filter (each chart should be aware of multiple inputs - and share the filter between onchange events)
+  names(list_opts) |>
+    purrr::map_chr(~ {
+      glue::glue("obj.{.x} == select_{paste0(.x, rand_id_begin)}.value")
+    }) |>
+    paste(collapse = " & ") -> filter_declaration
+
+  # generate the onchange events to monitor each of the inputs
+  names(list_opts) |>
+    purrr::map_chr(~ {
+      glue::glue("select_{paste0(.x, rand_id_begin)}.onchange = updateChart;")
+    }) |>
+    paste(collapse = "") -> onchg_events
+
+# create the javascript function for highcharts events, adding in the variable declaration, filters, and events generated from previous steps
+  
+js_fun <- "function(){{
+  var this_chart = this;
+  // create a cloned data set (to avoid highcharts mutate behavior)
+  const cloneData = (sample) => {{ return JSON.parse(JSON.stringify(sample));}}
+  // initialize empty array 
+  const init_data = [];
+  // loop over chart series and add to data array
+  this_chart.options.series.map((series,index)=>{{
+    init_data[index] = cloneData(series.data);
+  }})
+
+  // declare variables
+  {var_declaration}
+
+  // create shared updateChart function
+  function updateChart(){{
+      // map the series data to filter based on inputs
+      init_data.map((series,index)=>{{
+      new_data = series.filter(function(obj){{
+        return {filter_declaration}
+        }});
+      // only draw if data is available post filter
+      if(new_data.length>0){{
+        this_chart.series[index].setData(new_data);
+      }}
+
+      }})
+    // redraw chart
+    this_chart.reflow();
+
+  }}
+  // add on change monitor events for dropdowns
+  {onchg_events}
+  // updateChart (for first run)
+  updateChart();
+}}"
+
+# add javascript function as an onload event (so we filter down the data in the first view)
+  highcharter::hc_chart(hc,
+    events = list(
+      load = highcharter::JS(glue::glue(js_fun))
+    )
+  ) |>
+    htmltools::tagList(
+      select_options, . # create a html fragment including the dropdowns and chart 
+    ) |>
+    htmltools::browsable() # create a browsable option (shows chart in rstudio or in render)
+}
 
 
 
-# messing around with grid
+```
 
 
 
 ```{r}
-create_yaxis_horizontal <- function (naxis = 2, heights = 1, sep = 0.01, offset = 0, turnopposite = TRUE, 
-                                     ...) 
-{
+
+tidy_employment_data <- fpp3::us_employment |>
+  janitor::clean_names() |>
+  as_tibble() |>
+  filter(!str_detect(title, ":")) |>
+  rename(value = employed) |>
+  mutate(month = lubridate::as_date(month)) |>
+  group_by(title) |>
+  mutate(
+    yoy = value / lag(value, 12) - 1,
+    `Three year comp` = value / lag(value, 36) - 1
+  ) |>
+  gather(key, value, value:`Three year comp`)
+
+tidy_employment_data |>
+  mutate(month = datetime_to_timestamp(month)) |> # for highcharts date format
+  highcharter::hchart("line", highcharter::hcaes(month, value, name = title)) |>
+  hc_xAxis(type = "datetime") |>
+  add_multi_drop(
+    selectors = c("title", "key"),
+    selected = c("Total Private", "Three year comp")
+  )
+```
+
+### grouped data
+
+```{r}
+
+gapminder::gapminder |>
+  gather(key, value, lifeExp:pop) |>
+  janitor::clean_names() %>% 
+  hchart("scatter", hcaes(gdp_percap, value, group = continent, name = country)) |>
+  add_multi_drop(
+    c("year", "key")
+  )
+```
+
+
+### changing map variables / filtering
+
+```{r}
+
+gapminder::gapminder |>
+  mutate(iso_2 = countrycode::countrycode(country, "country.name", "iso2c")) |>
+  filter(country != "Kuwait") |>
+  gather(key, value, lifeExp:gdpPercap) |>
+  hcmap(
+    map = "custom/world",
+    download_map_data = TRUE,
+    joinBy = c("iso-a2", "iso_2"),
+    name = "",
+    nullColor = "transparent",
+    borderColor = "black",
+    value = "value"
+  ) |>
+  hc_colorAxis(minColor = "#e6ebf5",maxColor = getOption("highcharter.color_palette") %>% tail(1)) %>% 
+  # hc_add_theme()
+  add_multi_drop(
+    c("year", "key"),
+    c("2002", "lifeExp")
+  )
+```
+
+
+
+
+## legend and last value
+
+```{r}
+economics_long %>%
+  mutate(date = datetime_to_timestamp(date)) %>%
+  highcharter::hchart("area", hcaes(date, value01, group = variable)) %>%
+  highcharter::hc_xAxis(type = "datetime") %>%
+  hc_plotOptions(area = list(stacking = "normal")) %>%
+  hc_legend(layout = "proximate", align = "right", labelFormatter = JS("function () {
+           ydat = this.yData;
+            return this.name + ' ' + ydat[ydat.length-1].toFixed(2);
+        }"))
+```
+
+
+
+## Plot Grid
+
+
+
+```{r}
+highchart() %>%
+  hc_xAxis_multiples(structure(list(
+    list(width = "50%"),
+    list(opposite = FALSE, width = "45%", left = "55%")
+  ), class = "hc_axis_list")) %>%
+  hc_yAxis_multiples(structure(list(
+    list(width = "32.68%", height = "100%"),
+    list(opposite = TRUE, width = "65.36%", left = "32.68%", height = "49.505%", top = "0%"),
+    list(opposite = TRUE, width = "65.36%", left = "32.68%", height = "49.505%", top = "50.495%")
+  ), class = "hc_axis_list")) %>%
+  hc_add_series(data = c(1, 3, 2), xAxis = 0, yAxis = 0) %>%
+  hc_add_series(data = c(20, 40, 10), type = "area", xAxis = 1, yAxis = 1) %>%
+  hc_add_series(data = c(200, 400, 500), xAxis = 1, yAxis = 2) %>%
+  hc_add_series(data = c(500, 300, 400), type = "areaspline", xAxis = 1, yAxis = 2)
+
+create_yaxis_horizontal <- function(naxis = 2, heights = 1, sep = 0.01, offset = 0, turnopposite = TRUE,
+                                    ...) {
   pcnt <- function(x) paste0(x * 100, "%")
   heights <- rep(heights, length = naxis)
-  heights <- (heights/sum(heights)) %>% map(function(x) c(x, 
-                                                          sep)) %>% unlist() %>% head(-1) %>% {
-                                                            ./sum(.)
-                                                          } %>% round(5)
+  heights <- (heights / sum(heights)) %>%
+    map(function(x) {
+      c(
+        x,
+        sep
+      )
+    }) %>%
+    unlist() %>%
+    head(-1) %>%
+    {
+      . / sum(.)
+    } %>%
+    round(5)
   tops <- cumsum(c(0, head(heights, -1)))
   tops <- pcnt(tops)
   heights <- pcnt(heights)
   dfaxis <- tibble(width = heights, left = tops, offset = offset)
-  dfaxis <- dfaxis %>% dplyr::filter(seq_len(nrow(dfaxis))%%2 != 
-                                       0)
+  dfaxis <- dfaxis %>% dplyr::filter(seq_len(nrow(dfaxis)) %% 2 !=
+    0)
   if (turnopposite) {
     ops <- rep_len(c(FALSE, TRUE), length.out = nrow(dfaxis))
     dfaxis <- dfaxis %>% mutate(opposite = ops)
@@ -102,46 +338,14 @@ create_yaxis_horizontal <- function (naxis = 2, heights = 1, sep = 0.01, offset 
   axles
 }
 
-```
-
-```{r}
-highchart() %>%
-  hc_xAxis_multiples(structure(list(list(width = "50%"),
-                          list(opposite = FALSE,width = "45%",left = "55%")
-  ) ,class = "hc_axis_list")) %>% 
-  hc_yAxis_multiples(structure(list(list(width = "32.68%",height = "100%"),
-                                    list(opposite = TRUE,width = "65.36%",left = "32.68%",height = "49.505%",top = "0%"),
-                                    list(opposite = TRUE,width = "65.36%",left = "32.68%",height = "49.505%",top = "50.495%")
-  ) ,class = "hc_axis_list")) %>%
-  hc_add_series(data = c(1, 3, 2),xAxis = 0,yAxis = 0) %>%
-  hc_add_series(data = c(20, 40, 10), type = "area", xAxis = 1,yAxis = 1) %>%
-  hc_add_series(data = c(200, 400, 500), xAxis = 1,yAxis = 2) %>%
-  hc_add_series(data = c(500, 300, 400), type = "areaspline", xAxis = 1,yAxis = 2)
-
 
 highchart() %>%
-  hc_xAxis_multiples(create_yaxis_horizontal(naxis = 3,turnopposite = FALSE)) %>% 
-  hc_yAxis_multiples(create_yaxis_horizontal(naxis = 3, lineWidth = 2, title = list(text = NULL),turnopposite = FALSE,opposite = c(FALSE,TRUE,TRUE))) %>%
-  hc_add_series(data = c(1, 3, 2),xAxis = 0,yAxis = 0) %>%
-  hc_add_series(data = c(20, 40, 10), type = "area", xAxis = 1,yAxis = 1) %>%
-  hc_add_series(data = c(200, 400, 500), xAxis = 2,yAxis = 2) %>%
-  hc_add_series(data = c(500, 300, 400), type = "areaspline", xAxis = 2,yAxis = 2)
-
-```
-
-
-# legend and last value
-
-```{r}
-economics_long %>%
-  mutate(date = datetime_to_timestamp(date)) %>%
-  highcharter::hchart("area", hcaes(date, value01, group = variable)) %>%
-  highcharter::hc_xAxis(type = "datetime") %>%
-  hc_plotOptions(area = list(stacking = "normal")) %>%
-  hc_legend(layout = "proximate", align = "right", labelFormatter = JS("function () {
-           ydat = this.yData;
-            return this.name + ' ' + ydat[ydat.length-1].toFixed(2); 
-        }"))
+  hc_xAxis_multiples(create_yaxis_horizontal(naxis = 3, turnopposite = FALSE)) %>%
+  hc_yAxis_multiples(create_yaxis_horizontal(naxis = 3, lineWidth = 2, title = list(text = NULL), turnopposite = FALSE, opposite = c(FALSE, TRUE, TRUE))) %>%
+  hc_add_series(data = c(1, 3, 2), xAxis = 0, yAxis = 0) %>%
+  hc_add_series(data = c(20, 40, 10), type = "area", xAxis = 1, yAxis = 1) %>%
+  hc_add_series(data = c(200, 400, 500), xAxis = 2, yAxis = 2) %>%
+  hc_add_series(data = c(500, 300, 400), type = "areaspline", xAxis = 2, yAxis = 2)
 ```
 
 
@@ -149,9 +353,783 @@ economics_long %>%
 # Charts
 
 
-## Line Charts
 
-### Basic Line Chart
+```{r}
+
+n <- 6
+
+set.seed(123)
+
+colors <- c("#d35400", "#2980b9", "#2ecc71", "#f1c40f", "#2c3e50", "#7f8c8d")
+colors2 <- c("#000004", "#3B0F70", "#8C2981", "#DE4968", "#FE9F6D", "#FCFDBF")
+
+df <- data.frame(x = seq_len(n) - 1) %>%
+  mutate(
+    y = 10 + x + 10 * sin(x - 1),
+    z = 5 + (x * y) - median(x * y),
+    e = 10 * abs(rnorm(length(x))) + 2,
+    e = round(e, 1),
+    low = y - e,
+    high = y + e,
+    value = round(y - 1),
+    name = sample(fruit[str_length(fruit) <= 5], size = n),
+    color = rep(colors, length.out = n)
+  ) %>%
+  mutate_if(is.numeric, round, 1) %>%
+  select(-e)
+
+catch_all_data <- df %>%
+  mutate(
+    # label = name,
+    from = name[c(1, 1, 1, 2, 3, 4)],
+    to = name[c(3, 4, 5, 3, 6, 6)],
+    weight = c(1, 1, 1, 1, 2, 2)
+  )
+```
+
+
+
+
+
+
+## area
+
+The area series type.
+
+```{r}
+economics_long %>%
+  hchart("area", hcaes(date, value01, group = variable))
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/area-basic/" target="_blank">area-basic</a></div>
+</div>
+
+``` 
+
+
+
+## arearange
+
+The area range series is a carteseian series with higher and lower values for each point along an X axis, where the area between the values is shaded.
+
+```{r}
+jsonlite::fromJSON("https://cdn.jsdelivr.net/gh/highcharts/highcharts@v7.0.0/samples/data/range.json") -> area_range_data
+
+# area_range_data
+
+highchart() %>%
+  hc_add_series(data = as_tibble(area_range_data) %>% list_parse2(), type = "arearange") %>%
+  hc_xAxis(
+    type = "datetime"
+  ) %>%
+  hc_title(
+    text = "Temperature variation by day"
+  )
+```
+
+
+
+```{=html}
+
+
+
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/arearange/" target="_blank">arearange</a></div>
+</div>
+
+``` 
+
+
+
+## areaspline
+
+
+The area spline series is an area series where the graph between the points is smoothed into a spline.
+
+```{r}
+moose_and_deer <- tibble(
+  year = c(2000:2020),
+  Moose = c(
+    38000, 37300, 37892, 38564, 36770, 36026, 34978, 35657, 35620, 35971, 36409, 36435, 34643, 34956, 33199, 31136, 30835, 31611, 30666, 30319, 31766
+  ), Deer = c(
+    22534, 23599, 24533, 25195, 25896, 27635, 29173, 32646, 35686, 37709, 39143, 36829, 35031, 36202, 35140, 33718, 37773, 42556, 43820, 46445, 50048
+  )
+) %>%
+  gather(key, value, -year)
+
+
+
+hchart(moose_and_deer, "areaspline", hcaes(x = year, y = value, group = key)) %>%
+  hc_legend(
+    layout = "vertical",
+    align = "left", verticalAlign = "top",
+    x = 120, y = 70, floating = TRUE,
+    # backgroundColor = "var(--accent-color)",
+    labels = list(style = list(color = "var(--page-background)"))
+  ) %>%
+  hc_title(text = "Moose and deer hunting in Norway 2000-2021") %>%
+  hc_subtitle(text = "Source:SSB")
+```
+
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/areaspline/" target="_blank">areaspline</a></div>
+</div>
+
+``` 
+
+
+
+## bar
+
+A bar series is a special type of column series where the columns are horizontal.
+
+```{r}
+palmerpenguins::penguins %>%
+  group_by(species) %>%
+  summarize(flipper_length = mean(flipper_length_mm, na.rm = TRUE)) %>%
+  hchart("bar", hcaes(species, flipper_length, color = I(viridis::viridis(3)))) %>%
+  hc_title(text = "Average Flipper Length by Penguin Species")
+```
+
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/bar-basic/" target="_blank">bar-basic</a></div>
+</div>
+
+``` 
+
+
+
+## boxplot
+
+A box plot is a convenient way of depicting groups of data through their five-number summaries: the smallest observation (sample minimum), lower quartile (Q1), median (Q2), upper quartile (Q3), and largest observation(sample maximum).
+
+```{r}
+
+data(pokemon)
+
+dat <- data_to_boxplot(pokemon, height, type_1, name = "height in meters")
+
+highchart() %>%
+  hc_xAxis(type = "category") %>%
+  hc_add_series_list(dat)
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/box-plot/" target="_blank">box-plot</a></div>
+</div>
+
+``` 
+
+
+
+## bubble
+
+A bubble series is a three dimensional series type where each point renders an X, Y and Z value. Each points is drawn as a bubble where the position along the X and Y axes mark the X and Y values, and the size of the bubble relates to the Z value.
+
+```{r}
+structure(list(x = c(
+  95, 86.5, 80.8, 80.4, 80.3, 78.4, 74.2,
+  73.5, 71, 69.2, 68.6, 65.5, 65.4, 63.4, 64
+), y = c(
+  95, 102.9,
+  91.5, 102.5, 86.1, 70.1, 68.5, 83.1, 93.2, 57.6, 20, 126.4, 50.8,
+  51.8, 82.9
+), z = c(
+  13.8, 14.7, 15.8, 12, 11.8, 16.6, 14.5, 10,
+  24.7, 10.4, 16, 35.3, 28.5, 15.4, 31.3
+), name = c(
+  "BE", "DE",
+  "FI", "NL", "SE", "ES", "FR", "NO", "UK", "IT", "RU", "US", "HU",
+  "PT", "NZ"
+), country = c(
+  "Belgium", "Germany", "Finland", "Netherlands",
+  "Sweden", "Spain", "France", "Norway", "United Kingdom", "Italy",
+  "Russia", "United States", "Hungary", "Portugal", "New Zealand"
+)), class = c("tbl_df", "tbl", "data.frame"), row.names = c(
+  NA,
+  -15L
+)) -> sugar_and_fat
+
+
+sugar_and_fat %>%
+  hchart(., "bubble", hcaes(x = x, y = y, z = z)) %>%
+  hc_plotOptions(
+    series = list(
+      dataLabels = list(enabled = TRUE, format = "{point.name}")
+    )
+  ) %>%
+  hc_tooltip(
+    headerFormat = "<table>",
+    pointFormat = paste(
+      '<tr><th colspan="2"><h3>{point.country}</h3></th></tr>',
+      "<tr><th>Fat intake:</th><td>{point.x}g</td></tr>",
+      "<tr><th>Sugar intake:</th><td>{point.y}g</td></tr>",
+      "<tr><th>Obesity (adults):</th><td>{point.z}%</td></tr>"
+    ),
+    footerFormat = "</table>",
+    useHTML = TRUE
+  ) %>%
+  hc_xAxis(
+    plotLines = list(list(
+      color = "var(--text-color)", dashStyle = "dot", value = 65,
+      label = list(text = "Safe fat intake 65g/day", style = list(color = "var(--text-color)"), rotation = 0)
+    ))
+  ) %>%
+  hc_yAxis(
+    plotLines = list(list(
+      color = "var(--text-color)", dashStyle = "dot", value = 50,
+      label = list(text = "Safe sugar intake 50g/day", style = list(color = "var(--text-color)"), rotation = 0, align = "right")
+    ))
+  ) %>%
+  hc_title(
+    text = "Sugar and fat intake per country"
+  ) %>%
+  hc_subtitle(
+    text = "Source: Euromonitor and OECD"
+  )
+```
+
+
+
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/bubble/" target="_blank">bubble</a></div>
+</div>
+
+``` 
+
+
+
+## bullet
+
+A bullet graph is a variation of a bar graph. The bullet graph features a single measure, compares it to a target, and displays it in the context of qualitative ranges of performance that could be set using plotBands on yAxis.
+
+```{r}
+df <- data.frame(
+  y = sample(5:10),
+  target = sample(5:10),
+  x = LETTERS[1:6]
+)
+
+color_pal <- getOption("highcharter.color_palette")
+
+hchart(df, "bullet", hcaes(x = x, y = y, target = target), color = "#000000") %>%
+  hc_chart(inverted = TRUE) %>%
+  hc_yAxis(
+    min = 0,
+    max = 10,
+    gridLineWidth = 0,
+    plotBands = list(
+      list(from = 0, to = 7, color = color_pal[1]),
+      list(from = 7, to = 9, color = color_pal[2]),
+      list(from = 9, to = 10, color = color_pal[3])
+    )
+  ) %>%
+  hc_xAxis(
+    gridLineWidth = 0,
+    gridLineColor = "transparent"
+  ) %>%
+  hc_plotOptions(
+    series = list(
+      pointPadding = 0.25,
+      pointWidth = 15,
+      borderWidth = 0,
+      targetOptions = list(width = "200%")
+    )
+  )
+```
+
+
+
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/bullet-graph/" target="_blank">bullet-graph</a></div>
+</div>
+
+``` 
+
+
+
+## column
+
+Column series display one column per value along an X axis.
+
+
+```{r}
+
+diamonds %>%
+  group_by(cut, clarity) %>%
+  summarize(price = mean(price, na.rm = TRUE)) %>%
+  ungroup() %>%
+  hchart("column", hcaes(cut, price, group = clarity))
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/column-basic/" target="_blank">column-basic</a></div>
+</div>
+
+``` 
+
+
+
+## columnpyramid
+
+Column pyramid series display one pyramid per value along an X axis. To display horizontal pyramids, set chart.inverted to true.
+
+```{r}
+diamonds %>%
+  group_by(cut) %>%
+  summarize(price = mean(price, na.rm = TRUE)) %>%
+  ungroup() %>%
+  hchart("columnpyramid", hcaes(cut, price, group = cut))
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/column-pyramid/" target="_blank">column-pyramid</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/columnpyramid-stacked/" target="_blank">columnpyramid-stacked</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/columnpyramid-inverted/" target="_blank">columnpyramid-inverted</a></div>
+</div>
+
+``` 
+
+
+
+## columnrange
+
+The column range is a cartesian series type with higher and lower Y values along an X axis. To display horizontal bars, set chart.inverted to true.
+
+```{r}
+structure(list(name = "Temperatures", data = list(structure(c(-13.9, -16.7, -4.7, -4.4, -2.1, 5.9, 6.5, 4.7, 4.3, -3.5, -9.8, -11.5, 5.2, 10.6, 11.6, 16.8, 27.2, 29.4, 29.1, 25.4, 21.6, 15.1, 12.5, 8.4), .Dim = c(12L, 2L)))), class = "data.frame", row.names = 1L) %>%
+  pull(data) %>%
+  as.data.frame() %>%
+  list_parse2() %>%
+  hchart(type = "columnrange") %>%
+  hc_xAxis(categories = month.abb) %>%
+  hc_chart(inverted = TRUE) %>%
+  hc_plotOptions(columnrange = list(dataLabels = list(
+    enabled = TRUE,
+    format = "{y}°C"
+  ))) %>%
+  hc_legend(enabled = FALSE) %>%
+  hc_title(text = "Temperature variation by month") %>%
+  hc_subtitle(text = "Observed in Vik i Sogn, Norway, 2021 | Source: <a href=\"https://www.vikjavev.no/ver/\" target=\"_blank\">Vikjavev</a>")
+```
+
+
+
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/columnrange/" target="_blank">columnrange</a></div>
+</div>
+
+``` 
+
+
+
+
+
+
+## dependencywheel
+
+A dependency wheel chart is a type of flow diagram, where all nodes are laid out in a circle, and the flow between the are drawn as link bands.
+
+```{r}
+arc_data <- structure(list(from = c(
+  "Hamburg", "Hamburg", "Hamburg", "Hannover",
+  "Hannover", "Berlin", "Berlin", "Berlin", "Berlin", "Berlin",
+  "Berlin", "München", "München", "München", "München", "München",
+  "Stuttgart", "Frankfurt", "Frankfurt", "Frankfurt", "Frankfurt",
+  "Düsseldorf", "Düsseldorf", "Amsterdam", "Paris", "Paris",
+  "Paris", "Paris", "Paris", "Paris", "Paris", "Paris", "Paris",
+  "Nantes", "Bordeaux", "Nantes", "Milano", "Milano", "Milano",
+  "Milano", "Milano", "Milano", "Torino", "Venezia", "Roma", "Roma",
+  "Roma", "Catania"
+), to = c(
+  "Stuttgart", "Frankfurt", "München",
+  "Wien", "München", "Wien", "München", "Stuttgart", "Frankfurt",
+  "Köln", "Düsseldorf", "Düsseldorf", "Wien", "Frankfurt", "Köln",
+  "Amsterdam", "Wien", "Wien", "Amsterdam", "Paris", "Budapest",
+  "Wien", "Hamburg", "Paris", "Brest", "Nantes", "Bayonne", "Bordeaux",
+  "Toulouse", "Montpellier", "Marseille", "Nice", "Milano", "Nice",
+  "Lyon", "Lyon", "München", "Roma", "Bari", "Napoli", "Brindisi",
+  "Lamezia Terme", "Roma", "Napoli", "Bari", "Catania", "Brindisi",
+  "Milano"
+), weight = c(
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+)), class = c(
+  "tbl_df",
+  "tbl", "data.frame"
+), row.names = c(NA, -48L))
+
+highchart() %>%
+  hc_add_series(
+    type = "dependencywheel",
+    data = list_parse(arc_data)
+  )
+```
+
+
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/dependency-wheel/" target="_blank">dependency-wheel</a></div>
+</div>
+
+``` 
+
+
+
+## dumbbell
+
+The dumbbell series is a cartesian series with higher and lower values for each point along an X axis, connected with a line between the values.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/dumbbell/" target="_blank">dumbbell</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-dumbbell/styled-mode-dumbbell/" target="_blank">styled-mode-dumbbell</a></div>
+</div>
+
+``` 
+
+
+
+
+
+Requires highcharts-more.js and modules/dumbbell.js.
+
+```{r}
+
+tibble(
+  name = sample(letters, 10),
+  high = rnorm(10),
+  low = rnorm(10)
+) %>%
+  hchart("dumbbell", hcaes(x = name)) %>%
+  hc_plotOptions(dumbbell = list(
+    lowColor = "var(--text-color)"
+  ))
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/dumbbell/" target="_blank">dumbbell</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-dumbbell/styled-mode-dumbbell/" target="_blank">styled-mode-dumbbell</a></div>
+</div>
+
+``` 
+
+
+
+## errorbar
+
+Error bars are a graphical representation of the variability of data and are used on graphs to indicate the error, or uncertainty in a reported measurement.
+
+```{r}
+example_dat <- tibble(
+  Type = c("Human", "High-Elf", "Orc"),
+  key = c("World1", "World2", "World3")
+) %>%
+  expand.grid() %>%
+  mutate(mean = runif(9, 5, 7)) %>%
+  mutate(sd = runif(9, 0.5, 1))
+
+hchart(
+  example_dat,
+  "column",
+  hcaes(x = key, y = mean, group = Type),
+  id = c("a", "b", "c")
+) %>%
+  hc_add_series(
+    example_dat,
+    "errorbar",
+    hcaes(y = mean, x = key, low = mean - sd, high = mean + sd, group = Type),
+    linkedTo = c("a", "b", "c"),
+    enableMouseTracking = TRUE,
+    showInLegend = FALSE
+  ) %>%
+  hc_plotOptions(
+    errorbar = list(
+      color = "var(--text-color)",
+      # whiskerLength = 1,
+      stemWidth = 1
+    )
+  )
+```
+
+
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/error-bar/" target="_blank">error-bar</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-errorbar/on-scatter/" target="_blank">on-scatter</a></div>
+</div>
+
+``` 
+
+
+
+## funnel
+
+Funnel charts are a type of chart often used to visualize stages in a sales project, where the top are the initial stages with the most clients. It requires that the modules/funnel.js file is loaded.
+
+```{r}
+
+structure(list(name = c(
+  "Website visits", "Downloads", "Requested price list",
+  "Invoice sent", "Finalized"
+), y = c(15654, 4064, 1987, 976, 846)), class = c("tbl_df", "tbl", "data.frame"), row.names = c(
+  NA,
+  -5L
+)) %>%
+  hchart(type = "funnel")
+```
+
+
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/funnel/" target="_blank">funnel</a></div>
+</div>
+
+``` 
+
+
+
+
+
+## gauge
+
+Gauges are circular plots displaying one or more values with a dial pointing to values along the perimeter.
+
+```{r}
+col_stops <- data.frame(
+  q = c(0.15, 0.4, .8),
+  c = c("#55BF3B", "#DDDF0D", "#DF5353"),
+  stringsAsFactors = FALSE
+)
+
+highchart() %>%
+  hc_chart(type = "solidgauge") %>%
+  hc_pane(
+    startAngle = -90,
+    endAngle = 90,
+    background = list(
+      outerRadius = "100%",
+      innerRadius = "60%",
+      shape = "arc"
+    )
+  ) %>%
+  hc_tooltip(enabled = FALSE) %>%
+  hc_yAxis(
+    stops = list_parse2(col_stops),
+    lineWidth = 0,
+    minorTickWidth = 0,
+    tickAmount = 2,
+    min = 0,
+    max = 100,
+    labels = list(y = 26, style = list(fontSize = "22px"))
+  ) %>%
+  hc_add_series(
+    data = 90,
+    dataLabels = list(
+      y = -50,
+      borderWidth = 0,
+      useHTML = TRUE,
+      style = list(fontSize = "40px")
+    )
+  ) %>%
+  hc_size(height = 300)
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/gauge-speedometer/" target="_blank">gauge-speedometer</a></div>
+</div>
+
+``` 
+
+
+
+## heatmap
+
+A heatmap is a graphical representation of data where the individual values contained in a matrix are represented as colors.
+
+
+```{r}
+economics_long %>%
+  mutate(date = as_factor(as.character(date))) %>%
+  hchart("heatmap", hcaes(x = date, y = variable, value = value01)) %>%
+  hc_size(width = 900)
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/heatmap/" target="_blank">heatmap</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/heatmap-canvas/" target="_blank">heatmap-canvas</a></div>
+</div>
+
+``` 
+
+
+
+
+
+Requires modules/heatmap.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/heatmap/" target="_blank">heatmap</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/heatmap-canvas/" target="_blank">heatmap-canvas</a></div>
+</div>
+
+``` 
+
+
+
+## histogram
+
+A histogram is a column series which represents the distribution of the data set in the base series. Histogram splits data into bins and shows their frequencies.
+
+```{r}
+x <- diamonds$price
+hchart(x)
+hchart(density(x), type = "area", color = "#B71C1C", name = "Price")
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/histogram/" target="_blank">histogram</a></div>
+</div>
+
+``` 
+
+
+
+## item
+
+An item chart is an infographic chart where a number of items are laid out in either a rectangular or circular pattern. It can be used to visualize counts within a group, or for the circular pattern, typically a parliament.
+
+```{r}
+df <- data.frame(
+  stringsAsFactors = FALSE,
+  name = c(
+    "The Left",
+    "Social Democratic Party",
+    "Alliance 90/The Greens",
+    "Free Democratic Party",
+    "Christian Democratic Union",
+    "Christian Social Union in Bavaria",
+    "Alternative for Germany"
+  ),
+  count = c(69, 153, 67, 80, 200, 46, 94),
+  col = c(
+    "#BE3075", "#EB001F", "#64A12D", "#FFED00",
+    "#000000", "#008AC5", "#009EE0"
+  ),
+  abbrv = c("DIE LINKE", "SPD", "GRÜNE", "FDP", "CDU", "CSU", "AfD")
+)
+
+hchart(
+  df,
+  "item",
+  hcaes(
+    name = name,
+    y = count,
+    label = abbrv,
+    color = col
+  ),
+  name = "Representatives",
+  showInLegend = TRUE,
+  size = "100%",
+  center = list("50%", "75%"),
+  startAngle = -100,
+  endAngle = 100
+) %>%
+  hc_title(text = "Item chart with different layout") %>%
+  hc_legend(labelFormat = '{name} <span style="opacity: 0.4">{y}</span>')
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/parliament-chart" target="_blank">parliament-chart</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-item/rectangular" target="_blank">rectangular</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-item/symbols" target="_blank">symbols</a></div>
+</div>
+
+``` 
+
+
+
+
+The circular layout has much in common with a pie chart. Many of the item series options, like center, size and data label positioning, are inherited from the pie series and don't apply for rectangular layouts.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/parliament-chart" target="_blank">parliament-chart</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-item/rectangular" target="_blank">rectangular</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-item/symbols" target="_blank">symbols</a></div>
+</div>
+
+``` 
+
+
+
+## line
+
+A line series displays information as a series of data points connected by straight line segments.
+
 
 ```{r}
 data(economics_long, package = "ggplot2")
@@ -163,26 +1141,1311 @@ hchart(economics_long2, "line", hcaes(x = date, y = value01, group = variable))
 ```
 
 
-### Colored Area and Colored Line
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/line-basic/" target="_blank">line-basic</a></div>
+</div>
+
+``` 
+
+
+
+## lollipop
+
+The lollipop series is a carteseian series with a line anchored from the x axis and a dot at the end to mark the value.Requires highcharts-more.js, modules/dumbbell.js and modules/lollipop.js.
+
+```{r}
+tibble(
+  name = sample(letters, 10),
+  # high = rnorm(10),
+  low = rnorm(10)
+) %>%
+  hchart("lollipop", hcaes(x = name)) %>%
+  hc_add_dependency("modules/lollipop.js")
+```
+
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/lollipop/" target="_blank">lollipop</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-dumbbell/styled-mode-dumbbell/" target="_blank">styled-mode-dumbbell</a></div>
+</div>
+
+``` 
+
+
+
+
+
+
+## organization
+
+An organization chart is a diagram that shows the structure of an organization and the relationships and relative ranks of its parts and positions.
+
+
+```{r}
+tibble(
+  from = c("CEO", "CEO", "CTO"),
+  to = c("CTO", "CMO", "Dev")
+) %>%
+  hchart("organization") %>% 
+  hc_plotOptions(
+    organization = list(dataLabels = list(color = "black")
+  ))
+
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/organization-chart/" target="_blank">organization-chart</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-organization/horizontal/" target="_blank">horizontal</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-organization/borderless" target="_blank">borderless</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-organization/center-layout" target="_blank">center-layout</a></div>
+</div>
+
+``` 
+
+
+
+## packedbubble
+
+A packed bubble series is a two dimensional series type, where each point renders a value in X, Y position. Each point is drawn as a bubble where the bubbles don't overlap with each other and the radius of the bubble relates to the value.
+
+```{r}
+gapminder::gapminder %>%
+  filter(year == max(year)) %>%
+  hchart("packedbubble", hcaes(name = country, value = pop, z = pop, group = continent), dataLabels = list(enabled = TRUE, format = "{point.country}", filter = list(property = "y", operator = ">", value = 31210042))) %>%
+  hc_plotOptions(
+    packedbubble = list(
+      minSize = "30%", maxSize = "150%"
+    )
+  )
+
+
+
+
+
+hc <- gapminder::gapminder %>%
+  filter(year == max(year)) %>%
+  select(country, pop, continent) %>%
+  hchart("packedbubble", hcaes(name = country, value = pop, group = continent))
+
+q95 <- as.numeric(quantile(gapminder::gapminder$pop, .95))
+
+hc %>%
+  hc_tooltip(
+    useHTML = TRUE,
+    pointFormat = "<b>{point.name}:</b> {point.value}"
+  ) %>%
+  hc_plotOptions(
+    packedbubble = list(
+      maxSize = "150%",
+      zMin = 0,
+      layoutAlgorithm = list(
+        gravitationalConstant = 0.05,
+        splitSeries = TRUE, ## TRUE to group points
+        seriesInteraction = TRUE,
+        dragBetweenSeries = TRUE,
+        parentNodeLimit = TRUE
+      ),
+      dataLabels = list(
+        enabled = TRUE,
+        format = "{point.name}",
+        filter = list(
+          property = "y",
+          operator = ">",
+          value = q95
+        ),
+        color = "black",
+        style = list(
+          textOutline = "none",
+          fontWeight = "normal"
+        )
+      )
+    )
+  )
+```
+
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/packed-bubble/" target="_blank">packed-bubble</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/packed-bubble-split/" target="_blank">packed-bubble-split</a></div>
+</div>
+
+``` 
+
+
+
+
+## pie
+
+A pie chart is a circular graphic which is divided into slices to illustrate numerical proportion.
+
+```{r}
+
+
+diamond_data <- count(diamonds, clarity) %>% mutate(pct = scales::percent(n / sum(n)))
+
+
+hchart(
+  diamond_data, "pie", hcaes(name = clarity, y = n),
+  name = "Corte",
+  innerSize = "80%",
+  dataLabels = list(format = "{point.name}<br>({point.pct})")
+) %>%
+  hc_tooltip(
+    useHTML = TRUE,
+    style = list(fontSize = "30px"),
+    headerFormat = "",
+    pointFormat = "<div style='text-align: center;'> <b>{point.name}</b><br>{point.y} <br>{point.pct} </div>",
+    positioner = JS(
+      "function () {
+
+        /* one of the most important parts! */
+        xp =  this.chart.chartWidth/2 - this.label.width/2
+        yp =  this.chart.chartHeight/2 - this.label.height/2
+
+        return { x: xp, y: yp };
+
+      }"
+    ),
+    shadow = FALSE,
+    borderWidth = 0,
+    backgroundColor = "transparent",
+    hideDelay = 1000
+  )
+```
+
+
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/pie-basic/" target="_blank">pie-basic</a></div>
+</div>
+
+``` 
+
+
+
+## polygon
+
+A polygon series can be used to draw any freeform shape in the cartesian coordinate system. A fill is applied with the color option, and stroke is applied through lineWidth and lineColor options.
+
+```{r}
+hchart(structure(list(x = c(
+  184L, 183L, 182L, 182L, 181L, 181L, 180L,
+  180L, 180L, 180L, 180L, 179L, 179L, 178L, 178L, 177L, 177L, 176L,
+  176L, 175L, 175L, 174L, 174L, 174L, 173L, 173L, 172L, 172L, 171L,
+  171L, 171L, 170L, 170L, 170L, 170L, 169L, 169L, 169L, 169L, 168L,
+  168L, 168L, 168L, 167L, 167L, 166L, 166L, 165L, 165L, 165L, 164L,
+  164L, 163L, 162L, 159L
+), y = c(
+  87.9, 90.4, 89.9, 86.8, 89.2,
+  89.9, 89.9, 89.9, 89.1, 80.7, 86.3, 88.4, 90.7, 84.1, 103.7,
+  98.8, 103.2, 80.3, 91.1, 67, 93.7, 74.6, 84.7, 79.5, 73.6, 91.8,
+  69.5, 74, 64.1, 88, 67.8, 58.8, 63.9, 74.7, 65.1, 93, 81.1, 64.9,
+  71.9, 61.2, 65.9, 69.2, 56.5, 74.2, 60.5, 69.6, 74.7, 57.7, 58.4,
+  61.8, 60.5, 69.1, 62.5, 59.5, 53.9
+), name = c(
+  "Netherlands",
+  "Montenegro", "Estonia", "Denmark", "Iceland", "Czechia", "Serbia",
+  "Sweden", "Norway", "Dominica", "Finland", "Bermuda", "Puerto Rico",
+  "Belarus", "Cook Islands", "Niue", "American Samoa", "Russia",
+  "Saint Lucia", "Senegal", "Tonga", "Algeria", "Argentina", "Portugal",
+  "Mauritius", "Samoa", "Japan", "Bahrain", "Chad", "Tuvalu", "Sudan",
+  "Eritrea", "Kenya", "Mongolia", "Nigeria", "Nauru", "Micronesia",
+  "Ghana", "South Africa", "Vietnam", "Ivory Coast", "Maldives",
+  "Ethiopia", "Ecuador", "Burundi", "India", "Brunei", "Bangladesh",
+  "Madagascar", "Philippines", "Nepal", "Guatemala", "Yemen", "Laos",
+  "Timor-Leste"
+)), class = "data.frame", row.names = c(NA, 55L)), "scatter", hcaes(x, y,name = name)) %>%
+  hc_add_series(type = "polygon", data = structure(c(
+    163L, 162L, 162L, 163L, 164L, 170L, 181L, 182L, 173L,
+    166L, 42L, 46L, 55L, 64L, 70L, 90L, 100L, 90L, 52L, 45L
+  ), .Dim = c(
+    10L,
+    2L
+  )), color = "#ffffff80", enableMouseTracking = FALSE) %>%
+  hc_title(text = "average height and weight by country")
+```
+
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/polygon/" target="_blank">polygon</a></div>
+</div>
+
+``` 
+
+
+
+## pyramid
+
+A pyramid series is a special type of funnel, without neck and reversed by default.
+
+```{r}
+structure(list(name = c(
+  "Website visits", "Downloads", "Requested price list",
+  "Invoice sent", "Finalized"
+), y = c(15654, 4064, 1987, 976, 846)), class = c("tbl_df", "tbl", "data.frame"), row.names = c(
+  NA,
+  -5L
+)) %>%
+  hchart(type = "pyramid")
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/pyramid/" target="_blank">pyramid</a></div>
+</div>
+
+``` 
+
+
+
+
+
+
+## sankey
+
+
+
+A sankey diagram is a type of flow diagram, in which the width of the link between two nodes is shown proportionally to the flow quantity.
+
+```{r}
+data(diamonds, package = "ggplot2")
+diamonds2 <- select(diamonds, cut, color, clarity)
+# data_to_sankey(diamonds2)
+
+
+
+hchart(data_to_sankey(diamonds2), "sankey", name = "diamonds")
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/sankey-diagram/" target="_blank">sankey-diagram</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/sankey-inverted/" target="_blank">sankey-inverted</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/sankey-outgoing" target="_blank">sankey-outgoing</a></div>
+</div>
+
+``` 
+
+
+
+## scatter
+
+A scatter plot uses cartesian coordinates to display values for two variables for a set of data.
+
+```{r}
+hchart(sample_n(diamonds, 1000), "scatter", hcaes(carat, price, group = clarity))
+```
+
+
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/scatter/" target="_blank">scatter</a></div>
+</div>
+
+``` 
+
+
+
+
+
+
+
+
+## spline
+
+A spline series is a special type of line series, where the segments between the data points are smoothed.
+
+```{r}
+economics_long %>%
+  group_by(variable) %>%
+  sample_n(100) %>%
+  arrange(date) %>%
+  ungroup() %>%
+  hchart("spline", hcaes(date, value01, group = variable))
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/spline-irregular-time/" target="_blank">spline-irregular-time</a></div>
+</div>
+
+``` 
+
+
+
+## streamgraph
+
+A streamgraph is a type of stacked area graph which is displaced around acentral axis, resulting in a flowing, organic shape.
+
+```{r}
+winter_olympics_data <- structure(list(medals = c(
+  0L, 11L, 4L, 3L, 6L, 0L, 0L, 6L, 9L,
+  7L, 8L, 10L, 5L, 5L, 7L, 9L, 13L, 7L, 7L, 6L, 12L, 7L, 9L, 5L,
+  5L, 0L, 3L, 4L, 2L, 4L, 0L, 0L, 8L, 8L, 11L, 6L, 12L, 11L, 5L,
+  6L, 7L, 1L, 10L, 21L, 9L, 17L, 17L, 23L, 16L, 17L, 0L, 2L, 5L,
+  3L, 7L, 0L, 0L, 10L, 4L, 10L, 7L, 7L, 8L, 4L, 2L, 4L, 8L, 6L,
+  4L, 3L, 3L, 7L, 14L, 11L, 15L, 0L, 17L, 15L, 10L, 15L, 0L, 0L,
+  10L, 16L, 4L, 6L, 15L, 14L, 12L, 7L, 10L, 9L, 5L, 20L, 26L, 25L,
+  25L, 19L, 23L, 26L, 0L, 4L, 6L, 12L, 4L, 0L, 0L, 9L, 11L, 7L,
+  10L, 7L, 7L, 8L, 10L, 12L, 8L, 6L, 11L, 13L, 13L, 34L, 25L, 37L,
+  28L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 5L, 14L,
+  19L, 23L, 24L, 25L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 7L, 5L, 10L, 5L, 4L, 8L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 1L, 2L, 6L, 0L, 0L, 0L, 7L, 2L,
+  8L, 9L, 0L, 0L, 0L, 0L, 0L, 0L, 26L, 24L, 29L, 36L, 29L, 30L,
+  19L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 3L, 0L, 2L, 2L, 9L, 9L,
+  6L, 4L, 0L, 7L, 4L, 4L, 11L, 8L, 9L, 8L, 24L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 1L, 2L, 3L, 1L, 4L, 4L, 5L, 4L, 2L, 2L, 5L, 14L,
+  20L, 10L, 13L, 11L, 5L, 8L, 0L, 1L, 1L, 7L, 1L, 0L, 0L, 3L, 2L,
+  3L, 4L, 3L, 3L, 1L, 3L, 2L, 4L, 5L, 7L, 13L, 15L, 17L, 24L, 26L,
+  25L, 0L, 3L, 1L, 1L, 3L, 0L, 0L, 10L, 2L, 6L, 2L, 0L, 6L, 10L,
+  5L, 5L, 5L, 15L, 3L, 9L, 7L, 11L, 14L, 9L, 11L, 0L, 4L, 1L, 0L,
+  3L, 0L, 0L, 2L, 1L, 0L, 0L, 1L, 0L, 0L, 1L, 1L, 1L, 0L, 0L, 2L,
+  1L, 2L, 1L, 1L, 4L, 0L, 3L, 1L, 1L, 1L, 0L, 0L, 5L, 1L, 0L, 3L,
+  7L, 9L, 3L, 1L, 1L, 3L, 2L, 9L, 5L, 8L, 11L, 9L, 11L, 15L, 0L,
+  0L, 0L, 1L, 1L, 0L, 0L, 1L, 1L, 1L, 0L, 0L, 0L, 0L, 0L, 1L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 23L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 16L, 21L, 25L, 13L,
+  16L, 27L, 22L, 25L, 29L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 23L, 18L, 13L, 22L, 15L, 33L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 1L, 0L, 0L, 0L, 3L, 0L, 1L, 1L, 1L, 7L, 5L, 10L, 2L,
+  1L, 5L, 8L, 0L, 0L, 1L, 0L, 0L, 0L, 0L, 1L, 0L, 0L, 1L, 1L, 4L,
+  3L, 1L, 1L, 6L, 3L, 3L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 1L, 2L, 0L, 0L, 1L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 2L, 2L, 6L, 6L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 1L, 0L, 0L, 0L, 0L, 1L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  3L, 3L, 8L, 8L, 11L, 11L, 9L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 4L, 6L, 6L, 4L, 11L,
+  14L, 8L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 3L, 3L, 4L, 6L, 8L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 2L,
+  2L, 1L, 1L, 3L, 6L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 3L, 2L, 0L, 0L, 1L, 1L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 1L, 0L, 0L,
+  0L, 0L, 1L, 3L, 1L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 1L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 2L, 1L, 0L, 2L, 0L, 2L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 1L, 1L, 2L, 2L,
+  3L, 3L, 0L, 1L, 1L, 0L, 0L, 0L, 0L, 2L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 1L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 1L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 2L, 4L, 2L, 1L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 1L, 3L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 2L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 1L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 1L, 0L, 0L, 0L, 0L, 0L, 0L, 1L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 1L, 3L, 1L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 4L,
+  3L, 3L, 1L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 3L, 0L, 1L, 0L, 3L, 8L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 1L, 2L, 4L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 3L, 3L, 1L, 0L, 0L, 0L,
+  0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L,
+  0L, 1L, 0L, 0L, 0L, 0L, 0L
+), category = structure(c(
+  1L, 2L, 3L,
+  4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L,
+  18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L,
+  7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L,
+  20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L,
+  9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L,
+  22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
+  11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L,
+  24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L,
+  13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L,
+  1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L,
+  15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L,
+  3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L,
+  17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L,
+  5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L,
+  19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L,
+  8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L,
+  21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L,
+  10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L,
+  23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L,
+  12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L,
+  25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L,
+  14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L,
+  2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L,
+  16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L,
+  4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L,
+  18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L,
+  7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L,
+  20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L,
+  9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L,
+  22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
+  11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L,
+  24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L,
+  13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L,
+  1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L,
+  15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L,
+  3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L,
+  17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L,
+  5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L,
+  19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L,
+  8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L,
+  21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L,
+  10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L,
+  23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L,
+  12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L,
+  25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L,
+  14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L,
+  2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L,
+  16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L,
+  4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L,
+  18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L,
+  7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L,
+  20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L,
+  9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L,
+  22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
+  11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L,
+  24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L,
+  13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L,
+  1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L,
+  15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L,
+  3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L,
+  17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L,
+  5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L,
+  19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L,
+  8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L,
+  21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L,
+  10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L,
+  23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L,
+  12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L,
+  25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L,
+  14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L,
+  2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L,
+  16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L,
+  4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L,
+  18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L,
+  7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L,
+  20L, 21L, 22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L,
+  9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L,
+  22L, 23L, 24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
+  11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L,
+  24L, 25L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L,
+  13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L
+), .Label = c(
+  "", "1924 Chamonix", "1928 St. Moritz", "1932 Lake Placid",
+  "1936 Garmisch-Partenkirchen", "1940 <i>Cancelled (Sapporo)</i>",
+  "1944 <i>Cancelled (Cortina d'Ampezzo)</i>", "1948 St. Moritz",
+  "1952 Oslo", "1956 Cortina d'Ampezzo", "1960 Squaw Valley", "1964 Innsbruck",
+  "1968 Grenoble", "1972 Sapporo", "1976 Innsbruck", "1980 Lake Placid",
+  "1984 Sarajevo", "1988 Calgary", "1992 Albertville", "1994 Lillehammer",
+  "1998 Nagano", "2002 Salt Lake City", "2006 Turin", "2010 Vancouver",
+  "2014 Sochi"
+), class = "factor"), country = c(
+  "Finland", "Finland",
+  "Finland", "Finland", "Finland", "Finland", "Finland", "Finland",
+  "Finland", "Finland", "Finland", "Finland", "Finland", "Finland",
+  "Finland", "Finland", "Finland", "Finland", "Finland", "Finland",
+  "Finland", "Finland", "Finland", "Finland", "Finland", "Austria",
+  "Austria", "Austria", "Austria", "Austria", "Austria", "Austria",
+  "Austria", "Austria", "Austria", "Austria", "Austria", "Austria",
+  "Austria", "Austria", "Austria", "Austria", "Austria", "Austria",
+  "Austria", "Austria", "Austria", "Austria", "Austria", "Austria",
+  "Sweden", "Sweden", "Sweden", "Sweden", "Sweden", "Sweden", "Sweden",
+  "Sweden", "Sweden", "Sweden", "Sweden", "Sweden", "Sweden", "Sweden",
+  "Sweden", "Sweden", "Sweden", "Sweden", "Sweden", "Sweden", "Sweden",
+  "Sweden", "Sweden", "Sweden", "Sweden", "Norway", "Norway", "Norway",
+  "Norway", "Norway", "Norway", "Norway", "Norway", "Norway", "Norway",
+  "Norway", "Norway", "Norway", "Norway", "Norway", "Norway", "Norway",
+  "Norway", "Norway", "Norway", "Norway", "Norway", "Norway", "Norway",
+  "Norway", "U.S.", "U.S.", "U.S.", "U.S.", "U.S.", "U.S.", "U.S.",
+  "U.S.", "U.S.", "U.S.", "U.S.", "U.S.", "U.S.", "U.S.", "U.S.",
+  "U.S.", "U.S.", "U.S.", "U.S.", "U.S.", "U.S.", "U.S.", "U.S.",
+  "U.S.", "U.S.", "East Germany", "East Germany", "East Germany",
+  "East Germany", "East Germany", "East Germany", "East Germany",
+  "East Germany", "East Germany", "East Germany", "East Germany",
+  "East Germany", "East Germany", "East Germany", "East Germany",
+  "East Germany", "East Germany", "East Germany", "East Germany",
+  "East Germany", "East Germany", "East Germany", "East Germany",
+  "East Germany", "East Germany", "West Germany", "West Germany",
+  "West Germany", "West Germany", "West Germany", "West Germany",
+  "West Germany", "West Germany", "West Germany", "West Germany",
+  "West Germany", "West Germany", "West Germany", "West Germany",
+  "West Germany", "West Germany", "West Germany", "West Germany",
+  "West Germany", "West Germany", "West Germany", "West Germany",
+  "West Germany", "West Germany", "West Germany", "Germany", "Germany",
+  "Germany", "Germany", "Germany", "Germany", "Germany", "Germany",
+  "Germany", "Germany", "Germany", "Germany", "Germany", "Germany",
+  "Germany", "Germany", "Germany", "Germany", "Germany", "Germany",
+  "Germany", "Germany", "Germany", "Germany", "Germany", "Netherlands",
+  "Netherlands", "Netherlands", "Netherlands", "Netherlands", "Netherlands",
+  "Netherlands", "Netherlands", "Netherlands", "Netherlands", "Netherlands",
+  "Netherlands", "Netherlands", "Netherlands", "Netherlands", "Netherlands",
+  "Netherlands", "Netherlands", "Netherlands", "Netherlands", "Netherlands",
+  "Netherlands", "Netherlands", "Netherlands", "Netherlands", "Italy",
+  "Italy", "Italy", "Italy", "Italy", "Italy", "Italy", "Italy",
+  "Italy", "Italy", "Italy", "Italy", "Italy", "Italy", "Italy",
+  "Italy", "Italy", "Italy", "Italy", "Italy", "Italy", "Italy",
+  "Italy", "Italy", "Italy", "Canada", "Canada", "Canada", "Canada",
+  "Canada", "Canada", "Canada", "Canada", "Canada", "Canada", "Canada",
+  "Canada", "Canada", "Canada", "Canada", "Canada", "Canada", "Canada",
+  "Canada", "Canada", "Canada", "Canada", "Canada", "Canada", "Canada",
+  "Switzerland", "Switzerland", "Switzerland", "Switzerland", "Switzerland",
+  "Switzerland", "Switzerland", "Switzerland", "Switzerland", "Switzerland",
+  "Switzerland", "Switzerland", "Switzerland", "Switzerland", "Switzerland",
+  "Switzerland", "Switzerland", "Switzerland", "Switzerland", "Switzerland",
+  "Switzerland", "Switzerland", "Switzerland", "Switzerland", "Switzerland",
+  "Great Britain", "Great Britain", "Great Britain", "Great Britain",
+  "Great Britain", "Great Britain", "Great Britain", "Great Britain",
+  "Great Britain", "Great Britain", "Great Britain", "Great Britain",
+  "Great Britain", "Great Britain", "Great Britain", "Great Britain",
+  "Great Britain", "Great Britain", "Great Britain", "Great Britain",
+  "Great Britain", "Great Britain", "Great Britain", "Great Britain",
+  "Great Britain", "France", "France", "France", "France", "France",
+  "France", "France", "France", "France", "France", "France", "France",
+  "France", "France", "France", "France", "France", "France", "France",
+  "France", "France", "France", "France", "France", "France", "Hungary",
+  "Hungary", "Hungary", "Hungary", "Hungary", "Hungary", "Hungary",
+  "Hungary", "Hungary", "Hungary", "Hungary", "Hungary", "Hungary",
+  "Hungary", "Hungary", "Hungary", "Hungary", "Hungary", "Hungary",
+  "Hungary", "Hungary", "Hungary", "Hungary", "Hungary", "Hungary",
+  "Unified Team", "Unified Team", "Unified Team", "Unified Team",
+  "Unified Team", "Unified Team", "Unified Team", "Unified Team",
+  "Unified Team", "Unified Team", "Unified Team", "Unified Team",
+  "Unified Team", "Unified Team", "Unified Team", "Unified Team",
+  "Unified Team", "Unified Team", "Unified Team", "Unified Team",
+  "Unified Team", "Unified Team", "Unified Team", "Unified Team",
+  "Unified Team", "Soviet Union", "Soviet Union", "Soviet Union",
+  "Soviet Union", "Soviet Union", "Soviet Union", "Soviet Union",
+  "Soviet Union", "Soviet Union", "Soviet Union", "Soviet Union",
+  "Soviet Union", "Soviet Union", "Soviet Union", "Soviet Union",
+  "Soviet Union", "Soviet Union", "Soviet Union", "Soviet Union",
+  "Soviet Union", "Soviet Union", "Soviet Union", "Soviet Union",
+  "Soviet Union", "Soviet Union", "Russia", "Russia", "Russia",
+  "Russia", "Russia", "Russia", "Russia", "Russia", "Russia", "Russia",
+  "Russia", "Russia", "Russia", "Russia", "Russia", "Russia", "Russia",
+  "Russia", "Russia", "Russia", "Russia", "Russia", "Russia", "Russia",
+  "Russia", "Japan", "Japan", "Japan", "Japan", "Japan", "Japan",
+  "Japan", "Japan", "Japan", "Japan", "Japan", "Japan", "Japan",
+  "Japan", "Japan", "Japan", "Japan", "Japan", "Japan", "Japan",
+  "Japan", "Japan", "Japan", "Japan", "Japan", "Czechoslovakia",
+  "Czechoslovakia", "Czechoslovakia", "Czechoslovakia", "Czechoslovakia",
+  "Czechoslovakia", "Czechoslovakia", "Czechoslovakia", "Czechoslovakia",
+  "Czechoslovakia", "Czechoslovakia", "Czechoslovakia", "Czechoslovakia",
+  "Czechoslovakia", "Czechoslovakia", "Czechoslovakia", "Czechoslovakia",
+  "Czechoslovakia", "Czechoslovakia", "Czechoslovakia", "Czechoslovakia",
+  "Czechoslovakia", "Czechoslovakia", "Czechoslovakia", "Czechoslovakia",
+  "Poland", "Poland", "Poland", "Poland", "Poland", "Poland", "Poland",
+  "Poland", "Poland", "Poland", "Poland", "Poland", "Poland", "Poland",
+  "Poland", "Poland", "Poland", "Poland", "Poland", "Poland", "Poland",
+  "Poland", "Poland", "Poland", "Poland", "Spain", "Spain", "Spain",
+  "Spain", "Spain", "Spain", "Spain", "Spain", "Spain", "Spain",
+  "Spain", "Spain", "Spain", "Spain", "Spain", "Spain", "Spain",
+  "Spain", "Spain", "Spain", "Spain", "Spain", "Spain", "Spain",
+  "Spain", "China", "China", "China", "China", "China", "China",
+  "China", "China", "China", "China", "China", "China", "China",
+  "China", "China", "China", "China", "China", "China", "China",
+  "China", "China", "China", "China", "China", "South Korea", "South Korea",
+  "South Korea", "South Korea", "South Korea", "South Korea", "South Korea",
+  "South Korea", "South Korea", "South Korea", "South Korea", "South Korea",
+  "South Korea", "South Korea", "South Korea", "South Korea", "South Korea",
+  "South Korea", "South Korea", "South Korea", "South Korea", "South Korea",
+  "South Korea", "South Korea", "South Korea", "Czech Republic",
+  "Czech Republic", "Czech Republic", "Czech Republic", "Czech Republic",
+  "Czech Republic", "Czech Republic", "Czech Republic", "Czech Republic",
+  "Czech Republic", "Czech Republic", "Czech Republic", "Czech Republic",
+  "Czech Republic", "Czech Republic", "Czech Republic", "Czech Republic",
+  "Czech Republic", "Czech Republic", "Czech Republic", "Czech Republic",
+  "Czech Republic", "Czech Republic", "Czech Republic", "Czech Republic",
+  "Belarus", "Belarus", "Belarus", "Belarus", "Belarus", "Belarus",
+  "Belarus", "Belarus", "Belarus", "Belarus", "Belarus", "Belarus",
+  "Belarus", "Belarus", "Belarus", "Belarus", "Belarus", "Belarus",
+  "Belarus", "Belarus", "Belarus", "Belarus", "Belarus", "Belarus",
+  "Belarus", "Kazakhstan", "Kazakhstan", "Kazakhstan", "Kazakhstan",
+  "Kazakhstan", "Kazakhstan", "Kazakhstan", "Kazakhstan", "Kazakhstan",
+  "Kazakhstan", "Kazakhstan", "Kazakhstan", "Kazakhstan", "Kazakhstan",
+  "Kazakhstan", "Kazakhstan", "Kazakhstan", "Kazakhstan", "Kazakhstan",
+  "Kazakhstan", "Kazakhstan", "Kazakhstan", "Kazakhstan", "Kazakhstan",
+  "Kazakhstan", "Bulgaria", "Bulgaria", "Bulgaria", "Bulgaria",
+  "Bulgaria", "Bulgaria", "Bulgaria", "Bulgaria", "Bulgaria", "Bulgaria",
+  "Bulgaria", "Bulgaria", "Bulgaria", "Bulgaria", "Bulgaria", "Bulgaria",
+  "Bulgaria", "Bulgaria", "Bulgaria", "Bulgaria", "Bulgaria", "Bulgaria",
+  "Bulgaria", "Bulgaria", "Bulgaria", "Denmark", "Denmark", "Denmark",
+  "Denmark", "Denmark", "Denmark", "Denmark", "Denmark", "Denmark",
+  "Denmark", "Denmark", "Denmark", "Denmark", "Denmark", "Denmark",
+  "Denmark", "Denmark", "Denmark", "Denmark", "Denmark", "Denmark",
+  "Denmark", "Denmark", "Denmark", "Denmark", "Ukraine", "Ukraine",
+  "Ukraine", "Ukraine", "Ukraine", "Ukraine", "Ukraine", "Ukraine",
+  "Ukraine", "Ukraine", "Ukraine", "Ukraine", "Ukraine", "Ukraine",
+  "Ukraine", "Ukraine", "Ukraine", "Ukraine", "Ukraine", "Ukraine",
+  "Ukraine", "Ukraine", "Ukraine", "Ukraine", "Ukraine", "Australia",
+  "Australia", "Australia", "Australia", "Australia", "Australia",
+  "Australia", "Australia", "Australia", "Australia", "Australia",
+  "Australia", "Australia", "Australia", "Australia", "Australia",
+  "Australia", "Australia", "Australia", "Australia", "Australia",
+  "Australia", "Australia", "Australia", "Australia", "Belgium",
+  "Belgium", "Belgium", "Belgium", "Belgium", "Belgium", "Belgium",
+  "Belgium", "Belgium", "Belgium", "Belgium", "Belgium", "Belgium",
+  "Belgium", "Belgium", "Belgium", "Belgium", "Belgium", "Belgium",
+  "Belgium", "Belgium", "Belgium", "Belgium", "Belgium", "Belgium",
+  "Romania", "Romania", "Romania", "Romania", "Romania", "Romania",
+  "Romania", "Romania", "Romania", "Romania", "Romania", "Romania",
+  "Romania", "Romania", "Romania", "Romania", "Romania", "Romania",
+  "Romania", "Romania", "Romania", "Romania", "Romania", "Romania",
+  "Romania", "Liechtenstein", "Liechtenstein", "Liechtenstein",
+  "Liechtenstein", "Liechtenstein", "Liechtenstein", "Liechtenstein",
+  "Liechtenstein", "Liechtenstein", "Liechtenstein", "Liechtenstein",
+  "Liechtenstein", "Liechtenstein", "Liechtenstein", "Liechtenstein",
+  "Liechtenstein", "Liechtenstein", "Liechtenstein", "Liechtenstein",
+  "Liechtenstein", "Liechtenstein", "Liechtenstein", "Liechtenstein",
+  "Liechtenstein", "Liechtenstein", "Yugoslavia", "Yugoslavia",
+  "Yugoslavia", "Yugoslavia", "Yugoslavia", "Yugoslavia", "Yugoslavia",
+  "Yugoslavia", "Yugoslavia", "Yugoslavia", "Yugoslavia", "Yugoslavia",
+  "Yugoslavia", "Yugoslavia", "Yugoslavia", "Yugoslavia", "Yugoslavia",
+  "Yugoslavia", "Yugoslavia", "Yugoslavia", "Yugoslavia", "Yugoslavia",
+  "Yugoslavia", "Yugoslavia", "Yugoslavia", "Luxembourg", "Luxembourg",
+  "Luxembourg", "Luxembourg", "Luxembourg", "Luxembourg", "Luxembourg",
+  "Luxembourg", "Luxembourg", "Luxembourg", "Luxembourg", "Luxembourg",
+  "Luxembourg", "Luxembourg", "Luxembourg", "Luxembourg", "Luxembourg",
+  "Luxembourg", "Luxembourg", "Luxembourg", "Luxembourg", "Luxembourg",
+  "Luxembourg", "Luxembourg", "Luxembourg", "New Zealand", "New Zealand",
+  "New Zealand", "New Zealand", "New Zealand", "New Zealand", "New Zealand",
+  "New Zealand", "New Zealand", "New Zealand", "New Zealand", "New Zealand",
+  "New Zealand", "New Zealand", "New Zealand", "New Zealand", "New Zealand",
+  "New Zealand", "New Zealand", "New Zealand", "New Zealand", "New Zealand",
+  "New Zealand", "New Zealand", "New Zealand", "North Korea", "North Korea",
+  "North Korea", "North Korea", "North Korea", "North Korea", "North Korea",
+  "North Korea", "North Korea", "North Korea", "North Korea", "North Korea",
+  "North Korea", "North Korea", "North Korea", "North Korea", "North Korea",
+  "North Korea", "North Korea", "North Korea", "North Korea", "North Korea",
+  "North Korea", "North Korea", "North Korea", "Slovakia", "Slovakia",
+  "Slovakia", "Slovakia", "Slovakia", "Slovakia", "Slovakia", "Slovakia",
+  "Slovakia", "Slovakia", "Slovakia", "Slovakia", "Slovakia", "Slovakia",
+  "Slovakia", "Slovakia", "Slovakia", "Slovakia", "Slovakia", "Slovakia",
+  "Slovakia", "Slovakia", "Slovakia", "Slovakia", "Slovakia", "Croatia",
+  "Croatia", "Croatia", "Croatia", "Croatia", "Croatia", "Croatia",
+  "Croatia", "Croatia", "Croatia", "Croatia", "Croatia", "Croatia",
+  "Croatia", "Croatia", "Croatia", "Croatia", "Croatia", "Croatia",
+  "Croatia", "Croatia", "Croatia", "Croatia", "Croatia", "Croatia",
+  "Slovenia", "Slovenia", "Slovenia", "Slovenia", "Slovenia", "Slovenia",
+  "Slovenia", "Slovenia", "Slovenia", "Slovenia", "Slovenia", "Slovenia",
+  "Slovenia", "Slovenia", "Slovenia", "Slovenia", "Slovenia", "Slovenia",
+  "Slovenia", "Slovenia", "Slovenia", "Slovenia", "Slovenia", "Slovenia",
+  "Slovenia", "Latvia", "Latvia", "Latvia", "Latvia", "Latvia",
+  "Latvia", "Latvia", "Latvia", "Latvia", "Latvia", "Latvia", "Latvia",
+  "Latvia", "Latvia", "Latvia", "Latvia", "Latvia", "Latvia", "Latvia",
+  "Latvia", "Latvia", "Latvia", "Latvia", "Latvia", "Latvia", "Estonia",
+  "Estonia", "Estonia", "Estonia", "Estonia", "Estonia", "Estonia",
+  "Estonia", "Estonia", "Estonia", "Estonia", "Estonia", "Estonia",
+  "Estonia", "Estonia", "Estonia", "Estonia", "Estonia", "Estonia",
+  "Estonia", "Estonia", "Estonia", "Estonia", "Estonia", "Estonia",
+  "Uzbekistan", "Uzbekistan", "Uzbekistan", "Uzbekistan", "Uzbekistan",
+  "Uzbekistan", "Uzbekistan", "Uzbekistan", "Uzbekistan", "Uzbekistan",
+  "Uzbekistan", "Uzbekistan", "Uzbekistan", "Uzbekistan", "Uzbekistan",
+  "Uzbekistan", "Uzbekistan", "Uzbekistan", "Uzbekistan", "Uzbekistan",
+  "Uzbekistan", "Uzbekistan", "Uzbekistan", "Uzbekistan", "Uzbekistan"
+)), class = c("tbl_df", "tbl", "data.frame"), row.names = c(
+  NA,
+  -1100L
+))
+```
+
+```{r}
+winter_olympics_data %>%
+  hchart("streamgraph", hcaes(category, medals, group = country)) %>%
+  hc_legend(enabled = FALSE) %>%
+  hc_plotOptions(series = list(label = list(enabled = TRUE))) %>%
+  hc_yAxis(visible = FALSE) %>%
+  hc_xAxis(
+    crosshair = TRUE,
+    labels = list(
+      align = "left",
+      reserveSpace = FALSE,
+      rotation = 270
+    ), title = list(text = ""), lineWidth = 0,
+    margin = 20,
+    tickWidth = 0
+  ) %>%
+  hc_title(text = "Winter Olympics Medal Wins")
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/streamgraph/" target="_blank">streamgraph</a></div>
+</div>
+
+``` 
+
+
+
+## sunburst
+
+A Sunburst displays hierarchical data, where a level in the hierarchy is represented by a circle. The center represents the root node of the tree. The visualization bears a resemblance to both treemap and pie charts.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/sunburst" target="_blank">sunburst</a></div></div>
+</div>
+
+``` 
+
+```{r}
+library(dplyr)
+data(gapminder, package = "gapminder")
+
+gapminder_2007 <- gapminder::gapminder %>%
+  filter(year == max(year)) %>%
+  mutate(pop_mm = round(pop / 1e6))
+
+dout <- data_to_hierarchical(gapminder_2007, c(continent, country), pop_mm)
+
+
+
+hchart(dout, type = "sunburst")
+
+
+```
+
+
+## tilemap
+
+A tilemap series is a type of heatmap where the tile shapes are configurable.
+
+```{r}
+structure(list(
+  `hc-a2` = c(
+    "AL", "AK", "AZ", "AR", "CA", "CO",
+    "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS",
+    "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE",
+    "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA",
+    "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI",
+    "WY"
+  ), name = c(
+    "Alabama", "Alaska", "Arizona", "Arkansas", "California",
+    "Colorado", "Connecticut", "Delaware", "District of Columbia",
+    "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana",
+    "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland",
+    "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri",
+    "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey",
+    "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio",
+    "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina",
+    "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia",
+    "Washington", "West Virginia", "Wisconsin", "Wyoming"
+  ), region = c(
+    "South",
+    "West", "West", "South", "West", "West", "Northeast", "South",
+    "South", "South", "South", "West", "West", "Midwest", "Midwest",
+    "Midwest", "Midwest", "South", "South", "Northeast", "South",
+    "Northeast", "Midwest", "Midwest", "South", "Midwest", "West",
+    "Midwest", "West", "Northeast", "Northeast", "West", "Northeast",
+    "South", "Midwest", "Midwest", "South", "West", "Northeast",
+    "Northeast", "South", "Midwest", "South", "South", "West", "Northeast",
+    "South", "West", "South", "Midwest", "West"
+  ), x = c(
+    6, 0, 5,
+    5, 5, 4, 3, 4, 4, 8, 7, 8, 3, 3, 3, 3, 5, 4, 6, 0, 4, 2, 2, 2,
+    6, 4, 2, 4, 4, 1, 3, 6, 2, 5, 2, 3, 6, 4, 3, 2, 6, 3, 5, 7, 5,
+    1, 5, 2, 4, 2, 3
+  ), y = c(
+    7, 0, 3, 6, 2, 3, 11, 9, 10, 8, 8, 0,
+    2, 6, 7, 5, 5, 6, 5, 11, 8, 10, 7, 4, 6, 5, 2, 4, 2, 11, 10,
+    3, 9, 9, 3, 8, 4, 1, 9, 11, 8, 4, 7, 4, 4, 10, 8, 1, 7, 5, 3
+  ),
+  value = c(
+    4849377, 737732, 6745408, 2994079, 39250017, 5540545,
+    3596677, 935614, 7288000, 20612439, 10310371, 1419561, 1634464,
+    12801539, 6596855, 3107126, 2904021, 4413457, 4649676, 1330089,
+    6016447, 6811779, 9928301, 5519952, 2984926, 6093000, 1023579,
+    1881503, 2839099, 1326813, 8944469, 2085572, 19745289, 10146788,
+    739482, 11614373, 3878051, 3970239, 12784227, 1055173, 4832482,
+    853175, 6651194, 27862596, 2942902, 626011, 8411808, 7288000,
+    1850326, 5778708, 584153
+  )
+), class = c("tbl_df", "tbl", "data.frame"), row.names = c(NA, -51L)) -> tile_map_usa
+
+
+hchart(tile_map_usa, "tilemap", dataLabels = list(enabled = TRUE, format = "{point.hc-a2}")) %>%
+  hc_chart(inverted = TRUE) %>%
+  hc_colorAxis(
+    dataClasses = list_parse(bind_rows(c(
+      from = 0,
+      to = 1000000,
+      color = "#F9EDB3",
+      name = "< 1M"
+    ), c(
+      from = 1000000,
+      to = 5000000,
+      color = "#FFC428",
+      name = "1M - 5M"
+    ), c(
+      from = 5000000,
+      to = 20000000,
+      color = "#FF7987",
+      name = "5M - 20M"
+    ), c(
+      from = 20000000,
+      color = "#FF2371",
+      name = "> 20M"
+    )))
+  ) %>%
+  hc_title(
+    text = "U.S. states by population in 2016"
+  ) %>%
+  hc_subtitle(
+    text = "Source: Wikipedia"
+  ) %>%
+  hc_size(width = 600, height = 600)
+```
+
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/honeycomb-usa/" target="_blank">honeycomb-usa</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/maps/plotoptions/honeycomb-brazil/" target="_blank">honeycomb-brazil</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/maps/plotoptions/honeycomb-china/" target="_blank">honeycomb-china</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/maps/plotoptions/honeycomb-europe/" target="_blank">honeycomb-europe</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/maps/demo/circlemap-africa/" target="_blank">circlemap-africa</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/maps/demo/diamondmap" target="_blank">diamondmap</a></div>
+</div>
+
+``` 
+
+
+
+## timeline
+
+The timeline series presents given events along a drawn line.
+```{r}
+seq.Date(as.Date("1900-01-01"), as.Date("2000-01-01"), by = "year") %>%
+  sample(10) %>%
+  tibble(date = .) %>%
+  mutate(date = datetime_to_timestamp(date)) %>%
+  mutate(
+    description = paste("event ", 1:nrow(.)),
+    label = paste("event label", 1:nrow(.))
+  ) %>%
+  highcharter::hchart("timeline", hcaes(date), dataLabels = list(format = '<span style="color:{point.color}">● </span><span style="font-weight: bold;" >{point.x:%d %b %Y}</span><br/>{point.label} ', backgroundColor = "transparent",allowOverlap = FALSE)) %>%
+  hc_xAxis(type = "datetime")
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-timeline/alternate-labels" target="_blank">alternate-labels</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-timeline/inverted" target="_blank">inverted</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-timeline/datetime-axis" target="_blank">datetime-axis</a></div>
+</div>
+
+``` 
+
+
+
+## treemap
+
+A treemap displays hierarchical data using nested rectangles. The data can be laid out in varying ways depending on options.
+
+```{r}
+library(dplyr)
+data(gapminder, package = "gapminder")
+
+gapminder_2007 <- gapminder::gapminder %>%
+  filter(year == max(year)) %>%
+  mutate(pop_mm = round(pop / 1e6))
+
+dout <- data_to_hierarchical(gapminder_2007, c(continent, country), pop_mm)
+
+
+
+hchart(dout, type = "treemap")
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/treemap-large-dataset/" target="_blank">treemap-large-dataset</a></div>
+</div>
+
+``` 
+
+
+
+
+
+
+
+## vector
+
+A vector plot is a type of cartesian chart where each point has an X and Y position, a length and a direction. Vectors are drawn as arrows.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/vector-plot/" target="_blank">vector-plot</a></div>
+</div>
+
+``` 
+
+```{r}
+vector_data <- structure(list(
+  V1 = c(
+    5L, 5L, 5L, 5L, 5L, 5L, 5L, 5L, 5L, 5L,
+    5L, 5L, 5L, 5L, 5L, 5L, 5L, 5L, 5L, 10L, 10L, 10L, 10L, 10L,
+    10L, 10L, 10L, 10L, 10L, 10L, 10L, 10L, 10L, 10L, 10L, 10L, 10L,
+    10L, 15L, 15L, 15L, 15L, 15L, 15L, 15L, 15L, 15L, 15L, 15L, 15L,
+    15L, 15L, 15L, 15L, 15L, 15L, 15L, 20L, 20L, 20L, 20L, 20L, 20L,
+    20L, 20L, 20L, 20L, 20L, 20L, 20L, 20L, 20L, 20L, 20L, 20L, 20L,
+    25L, 25L, 25L, 25L, 25L, 25L, 25L, 25L, 25L, 25L, 25L, 25L, 25L,
+    25L, 25L, 25L, 25L, 25L, 25L, 30L, 30L, 30L, 30L, 30L, 30L, 30L,
+    30L, 30L, 30L, 30L, 30L, 30L, 30L, 30L, 30L, 30L, 30L, 30L, 35L,
+    35L, 35L, 35L, 35L, 35L, 35L, 35L, 35L, 35L, 35L, 35L, 35L, 35L,
+    35L, 35L, 35L, 35L, 35L, 40L, 40L, 40L, 40L, 40L, 40L, 40L, 40L,
+    40L, 40L, 40L, 40L, 40L, 40L, 40L, 40L, 40L, 40L, 40L, 45L, 45L,
+    45L, 45L, 45L, 45L, 45L, 45L, 45L, 45L, 45L, 45L, 45L, 45L, 45L,
+    45L, 45L, 45L, 45L, 50L, 50L, 50L, 50L, 50L, 50L, 50L, 50L, 50L,
+    50L, 50L, 50L, 50L, 50L, 50L, 50L, 50L, 50L, 50L, 55L, 55L, 55L,
+    55L, 55L, 55L, 55L, 55L, 55L, 55L, 55L, 55L, 55L, 55L, 55L, 55L,
+    55L, 55L, 55L, 60L, 60L, 60L, 60L, 60L, 60L, 60L, 60L, 60L, 60L,
+    60L, 60L, 60L, 60L, 60L, 60L, 60L, 60L, 60L, 65L, 65L, 65L, 65L,
+    65L, 65L, 65L, 65L, 65L, 65L, 65L, 65L, 65L, 65L, 65L, 65L, 65L,
+    65L, 65L, 70L, 70L, 70L, 70L, 70L, 70L, 70L, 70L, 70L, 70L, 70L,
+    70L, 70L, 70L, 70L, 70L, 70L, 70L, 70L, 75L, 75L, 75L, 75L, 75L,
+    75L, 75L, 75L, 75L, 75L, 75L, 75L, 75L, 75L, 75L, 75L, 75L, 75L,
+    75L, 80L, 80L, 80L, 80L, 80L, 80L, 80L, 80L, 80L, 80L, 80L, 80L,
+    80L, 80L, 80L, 80L, 80L, 80L, 80L, 85L, 85L, 85L, 85L, 85L, 85L,
+    85L, 85L, 85L, 85L, 85L, 85L, 85L, 85L, 85L, 85L, 85L, 85L, 85L,
+    90L, 90L, 90L, 90L, 90L, 90L, 90L, 90L, 90L, 90L, 90L, 90L, 90L,
+    90L, 90L, 90L, 90L, 90L, 90L, 95L, 95L, 95L, 95L, 95L, 95L, 95L,
+    95L, 95L, 95L, 95L, 95L, 95L, 95L, 95L, 95L, 95L, 95L, 95L
+  ),
+  V2 = c(
+    5L, 10L, 15L, 20L, 25L, 30L, 35L, 40L, 45L, 50L, 55L,
+    60L, 65L, 70L, 75L, 80L, 85L, 90L, 95L, 5L, 10L, 15L, 20L,
+    25L, 30L, 35L, 40L, 45L, 50L, 55L, 60L, 65L, 70L, 75L, 80L,
+    85L, 90L, 95L, 5L, 10L, 15L, 20L, 25L, 30L, 35L, 40L, 45L,
+    50L, 55L, 60L, 65L, 70L, 75L, 80L, 85L, 90L, 95L, 5L, 10L,
+    15L, 20L, 25L, 30L, 35L, 40L, 45L, 50L, 55L, 60L, 65L, 70L,
+    75L, 80L, 85L, 90L, 95L, 5L, 10L, 15L, 20L, 25L, 30L, 35L,
+    40L, 45L, 50L, 55L, 60L, 65L, 70L, 75L, 80L, 85L, 90L, 95L,
+    5L, 10L, 15L, 20L, 25L, 30L, 35L, 40L, 45L, 50L, 55L, 60L,
+    65L, 70L, 75L, 80L, 85L, 90L, 95L, 5L, 10L, 15L, 20L, 25L,
+    30L, 35L, 40L, 45L, 50L, 55L, 60L, 65L, 70L, 75L, 80L, 85L,
+    90L, 95L, 5L, 10L, 15L, 20L, 25L, 30L, 35L, 40L, 45L, 50L,
+    55L, 60L, 65L, 70L, 75L, 80L, 85L, 90L, 95L, 5L, 10L, 15L,
+    20L, 25L, 30L, 35L, 40L, 45L, 50L, 55L, 60L, 65L, 70L, 75L,
+    80L, 85L, 90L, 95L, 5L, 10L, 15L, 20L, 25L, 30L, 35L, 40L,
+    45L, 50L, 55L, 60L, 65L, 70L, 75L, 80L, 85L, 90L, 95L, 5L,
+    10L, 15L, 20L, 25L, 30L, 35L, 40L, 45L, 50L, 55L, 60L, 65L,
+    70L, 75L, 80L, 85L, 90L, 95L, 5L, 10L, 15L, 20L, 25L, 30L,
+    35L, 40L, 45L, 50L, 55L, 60L, 65L, 70L, 75L, 80L, 85L, 90L,
+    95L, 5L, 10L, 15L, 20L, 25L, 30L, 35L, 40L, 45L, 50L, 55L,
+    60L, 65L, 70L, 75L, 80L, 85L, 90L, 95L, 5L, 10L, 15L, 20L,
+    25L, 30L, 35L, 40L, 45L, 50L, 55L, 60L, 65L, 70L, 75L, 80L,
+    85L, 90L, 95L, 5L, 10L, 15L, 20L, 25L, 30L, 35L, 40L, 45L,
+    50L, 55L, 60L, 65L, 70L, 75L, 80L, 85L, 90L, 95L, 5L, 10L,
+    15L, 20L, 25L, 30L, 35L, 40L, 45L, 50L, 55L, 60L, 65L, 70L,
+    75L, 80L, 85L, 90L, 95L, 5L, 10L, 15L, 20L, 25L, 30L, 35L,
+    40L, 45L, 50L, 55L, 60L, 65L, 70L, 75L, 80L, 85L, 90L, 95L,
+    5L, 10L, 15L, 20L, 25L, 30L, 35L, 40L, 45L, 50L, 55L, 60L,
+    65L, 70L, 75L, 80L, 85L, 90L, 95L, 5L, 10L, 15L, 20L, 25L,
+    30L, 35L, 40L, 45L, 50L, 55L, 60L, 65L, 70L, 75L, 80L, 85L,
+    90L, 95L
+  ), V3 = c(
+    190L, 185L, 180L, 175L, 170L, 165L, 160L,
+    155L, 150L, 145L, 140L, 135L, 130L, 125L, 120L, 115L, 110L,
+    105L, 100L, 185L, 180L, 175L, 170L, 165L, 160L, 155L, 150L,
+    145L, 140L, 135L, 130L, 125L, 120L, 115L, 110L, 105L, 100L,
+    95L, 180L, 175L, 170L, 165L, 160L, 155L, 150L, 145L, 140L,
+    135L, 130L, 125L, 120L, 115L, 110L, 105L, 100L, 95L, 90L,
+    175L, 170L, 165L, 160L, 155L, 150L, 145L, 140L, 135L, 130L,
+    125L, 120L, 115L, 110L, 105L, 100L, 95L, 90L, 85L, 170L,
+    165L, 160L, 155L, 150L, 145L, 140L, 135L, 130L, 125L, 120L,
+    115L, 110L, 105L, 100L, 95L, 90L, 85L, 80L, 165L, 160L, 155L,
+    150L, 145L, 140L, 135L, 130L, 125L, 120L, 115L, 110L, 105L,
+    100L, 95L, 90L, 85L, 80L, 75L, 160L, 155L, 150L, 145L, 140L,
+    135L, 130L, 125L, 120L, 115L, 110L, 105L, 100L, 95L, 90L,
+    85L, 80L, 75L, 70L, 155L, 150L, 145L, 140L, 135L, 130L, 125L,
+    120L, 115L, 110L, 105L, 100L, 95L, 90L, 85L, 80L, 75L, 70L,
+    65L, 150L, 145L, 140L, 135L, 130L, 125L, 120L, 115L, 110L,
+    105L, 100L, 95L, 90L, 85L, 80L, 75L, 70L, 65L, 60L, 145L,
+    140L, 135L, 130L, 125L, 120L, 115L, 110L, 105L, 100L, 95L,
+    90L, 85L, 80L, 75L, 70L, 65L, 60L, 55L, 140L, 135L, 130L,
+    125L, 120L, 115L, 110L, 105L, 100L, 95L, 90L, 85L, 80L, 75L,
+    70L, 65L, 60L, 55L, 50L, 135L, 130L, 125L, 120L, 115L, 110L,
+    105L, 100L, 95L, 90L, 85L, 80L, 75L, 70L, 65L, 60L, 55L,
+    50L, 45L, 130L, 125L, 120L, 115L, 110L, 105L, 100L, 95L,
+    90L, 85L, 80L, 75L, 70L, 65L, 60L, 55L, 50L, 45L, 40L, 125L,
+    120L, 115L, 110L, 105L, 100L, 95L, 90L, 85L, 80L, 75L, 70L,
+    65L, 60L, 55L, 50L, 45L, 40L, 35L, 120L, 115L, 110L, 105L,
+    100L, 95L, 90L, 85L, 80L, 75L, 70L, 65L, 60L, 55L, 50L, 45L,
+    40L, 35L, 30L, 115L, 110L, 105L, 100L, 95L, 90L, 85L, 80L,
+    75L, 70L, 65L, 60L, 55L, 50L, 45L, 40L, 35L, 30L, 25L, 110L,
+    105L, 100L, 95L, 90L, 85L, 80L, 75L, 70L, 65L, 60L, 55L,
+    50L, 45L, 40L, 35L, 30L, 25L, 20L, 105L, 100L, 95L, 90L,
+    85L, 80L, 75L, 70L, 65L, 60L, 55L, 50L, 45L, 40L, 35L, 30L,
+    25L, 20L, 15L, 100L, 95L, 90L, 85L, 80L, 75L, 70L, 65L, 60L,
+    55L, 50L, 45L, 40L, 35L, 30L, 25L, 20L, 15L, 10L
+  ), V4 = c(
+    18L,
+    27L, 36L, 45L, 54L, 63L, 72L, 81L, 90L, 99L, 108L, 117L,
+    126L, 135L, 144L, 153L, 162L, 171L, 180L, 27L, 36L, 45L,
+    54L, 63L, 72L, 81L, 90L, 99L, 108L, 117L, 126L, 135L, 144L,
+    153L, 162L, 171L, 180L, 189L, 36L, 45L, 54L, 63L, 72L, 81L,
+    90L, 99L, 108L, 117L, 126L, 135L, 144L, 153L, 162L, 171L,
+    180L, 189L, 198L, 45L, 54L, 63L, 72L, 81L, 90L, 99L, 108L,
+    117L, 126L, 135L, 144L, 153L, 162L, 171L, 180L, 189L, 198L,
+    207L, 54L, 63L, 72L, 81L, 90L, 99L, 108L, 117L, 126L, 135L,
+    144L, 153L, 162L, 171L, 180L, 189L, 198L, 207L, 216L, 63L,
+    72L, 81L, 90L, 99L, 108L, 117L, 126L, 135L, 144L, 153L, 162L,
+    171L, 180L, 189L, 198L, 207L, 216L, 225L, 72L, 81L, 90L,
+    99L, 108L, 117L, 126L, 135L, 144L, 153L, 162L, 171L, 180L,
+    189L, 198L, 207L, 216L, 225L, 234L, 81L, 90L, 99L, 108L,
+    117L, 126L, 135L, 144L, 153L, 162L, 171L, 180L, 189L, 198L,
+    207L, 216L, 225L, 234L, 243L, 90L, 99L, 108L, 117L, 126L,
+    135L, 144L, 153L, 162L, 171L, 180L, 189L, 198L, 207L, 216L,
+    225L, 234L, 243L, 252L, 99L, 108L, 117L, 126L, 135L, 144L,
+    153L, 162L, 171L, 180L, 189L, 198L, 207L, 216L, 225L, 234L,
+    243L, 252L, 261L, 108L, 117L, 126L, 135L, 144L, 153L, 162L,
+    171L, 180L, 189L, 198L, 207L, 216L, 225L, 234L, 243L, 252L,
+    261L, 270L, 117L, 126L, 135L, 144L, 153L, 162L, 171L, 180L,
+    189L, 198L, 207L, 216L, 225L, 234L, 243L, 252L, 261L, 270L,
+    279L, 126L, 135L, 144L, 153L, 162L, 171L, 180L, 189L, 198L,
+    207L, 216L, 225L, 234L, 243L, 252L, 261L, 270L, 279L, 288L,
+    135L, 144L, 153L, 162L, 171L, 180L, 189L, 198L, 207L, 216L,
+    225L, 234L, 243L, 252L, 261L, 270L, 279L, 288L, 297L, 144L,
+    153L, 162L, 171L, 180L, 189L, 198L, 207L, 216L, 225L, 234L,
+    243L, 252L, 261L, 270L, 279L, 288L, 297L, 306L, 153L, 162L,
+    171L, 180L, 189L, 198L, 207L, 216L, 225L, 234L, 243L, 252L,
+    261L, 270L, 279L, 288L, 297L, 306L, 315L, 162L, 171L, 180L,
+    189L, 198L, 207L, 216L, 225L, 234L, 243L, 252L, 261L, 270L,
+    279L, 288L, 297L, 306L, 315L, 324L, 171L, 180L, 189L, 198L,
+    207L, 216L, 225L, 234L, 243L, 252L, 261L, 270L, 279L, 288L,
+    297L, 306L, 315L, 324L, 333L, 180L, 189L, 198L, 207L, 216L,
+    225L, 234L, 243L, 252L, 261L, 270L, 279L, 288L, 297L, 306L,
+    315L, 324L, 333L, 342L
+  )
+), class = c("tbl_df", "tbl", "data.frame"), row.names = c(NA, -361L))
+```
+
+```{r}
+hchart(list_parse2(vector_data), type = "vector")
+```
+
+
+
+## venn
+
+A Venn diagram displays all possible logical relations between acollection of different sets. The sets are represented by circles, and the relation between the sets are displayed by the overlap or lack of overlap between them. The venn diagram is a special case of Euler diagrams, which can also be displayed by this series type.
+
+```{r}
+highchart() %>%
+  hc_chart(type = "venn") %>%
+  hc_add_series(
+    dataLabels = list(style = list(fontSize = "20px")),
+    name = "Venn Diagram",
+    data = list(
+      list(
+        name = "People who are<br>breaking my heart.",
+        sets = list("A"), value = 5
+      ),
+      list(
+        name = "People who are shaking<br> my confidence daily.",
+        sets = list("B"), value = 5
+      ),
+      list(
+        name = "Cecilia", sets = list("B", "A"), value = 1
+      )
+    )
+  ) %>%
+  hc_title(text = "Venn Diagram")
+
+highchart() %>%
+  hc_chart(type = "venn") %>%
+  hc_add_series(
+    name = "Euler Diagram",
+    dataLabels = list(style = list(fontSize = "20px")),
+    data = list(
+      list(sets = list("A"), name = "Animals", value = 5),
+      list(sets = list("B"), name = "Four Legs", value = 1),
+      list(sets = list("B", "A"), value = 1),
+      list(sets = list("C"), name = "Mineral", value = 2)
+    )
+  ) %>%
+  hc_title(text = "Euler Diagram")
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/venn-diagram/" target="_blank">venn-diagram</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/euler-diagram/" target="_blank">euler-diagram</a></div>
+</div>
+
+``` 
+
+
+
+## waterfall
+
+A waterfall chart displays sequentially introduced positive or negative values in cumulative columns.
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/waterfall/" target="_blank">waterfall</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/waterfall-inverted/" target="_blank">waterfall-inverted</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/waterfall-stacked/" target="_blank">waterfall-stacked</a></div>
+</div>
+
+``` 
+
+
+```{r}
+
+catch_all_data %>%
+  hchart("waterfall", hcaes(color = color))
+```
+
+
+
+## wordcloud
+
+A word cloud is a visualization of a set of words, where the size and placement of a word is determined by how it is weighted.
+
+```{r}
+tidytext::sentiments %>%
+  filter(sentiment == "positive") %>%
+  sample_n(200) %>%
+  {
+    bind_rows(., sample_n(., 100)) %>% bind_rows(sample_n(., 100))
+  } %>%
+  count(word) %>%
+  hchart("wordcloud", hcaes(name = word, weight = n))
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/wordcloud" target="_blank">wordcloud</a></div>
+</div>
+
+``` 
+
+
+
+## xrange
+
+The X-range series displays ranges on the X axis, typically time intervals with a start and end date.
+
+```{r}
+
+
+N <- 7
+
+set.seed(1234)
+
+df <- tibble(
+  start = Sys.Date() + months(sample(10:20, size = N)),
+  end = start + months(sample(1:3, size = N, replace = TRUE)),
+  cat = rep(1:5, length.out = N) - 1,
+  progress = round(stats::runif(N), 1)
+) |>
+  mutate_if(is.Date, datetime_to_timestamp)
+
+hchart(
+  df,
+  "xrange",
+  hcaes(x = start, x2 = end, y = cat, partialFill = progress),
+  dataLabels = list(enabled = TRUE)
+) %>%
+  hc_xAxis(
+    title = FALSE,
+    type = "datetime"
+  ) %>%
+  hc_yAxis(
+    title = FALSE,
+    categories = c("Prototyping", "Development", "Testing", "Validation", "Modelling")
+  )
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/x-range/" target="_blank">x-range</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/css/x-range/" target="_blank">x-range</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/chart/inverted-xrange/" target="_blank">inverted-xrange</a></div>
+</div>
+
+``` 
+
+```{r}
+# fix for strange headers after html block
+div("&nbsp")
+```
+
+
+
+# Jbkunst references
+
+
+
+## Colored Area and Colored Line
 
 ```{r}
 
 library(dplyr)
 
-set.seed(123); n <- 200; colors <- sample(viridisLite::cividis(5, end = .9))
+set.seed(123)
+n <- 200
+colors <- sample(viridisLite::cividis(5, end = .9))
 
 df <- tibble(
   x = 1:n,
   y = abs(arima.sim(n = n, model = list(ar = c(0.9)))) + 2,
   y2 = 10 + y,
-  col = rep(colors, each = n/10, length.out = n)
+  col = rep(colors, each = n / 10, length.out = n)
 )
 
-hchart(df, "coloredarea", hcaes(x, y, segmentColor = col)) %>% 
-   hc_add_series(df, "coloredline", hcaes(x, y2 , segmentColor = col)) %>% 
-   hc_add_dependency("plugins/multicolor_series.js")
-
-
+hchart(df, "coloredarea", hcaes(x, y, segmentColor = col)) %>%
+  hc_add_series(df, "coloredline", hcaes(x, y2, segmentColor = col)) %>%
+  hc_add_dependency("plugins/multicolor_series.js")
 ```
 
 ## Scatter and Model Confidence Interval
@@ -193,10 +2456,10 @@ library(broom)
 
 modlss <- loess(dist ~ speed, data = cars)
 
-fit <- arrange(augment(modlss), speed) %>% 
+fit <- arrange(augment(modlss), speed) %>%
   mutate(.se = predict(modlss, se = TRUE)$se.fit)
 
-head(fit)
+# head(fit)
 
 hc <- hchart(
   cars,
@@ -204,7 +2467,7 @@ hc <- hchart(
   hcaes(x = speed, y = dist),
   name = "Speed and Stopping Distances of Cars",
   showInLegend = TRUE
-  )
+)
 
 
 qtint <- qt(0.975, predict(modlss, se = TRUE)$df)
@@ -218,21 +2481,20 @@ hc %>%
     id = "fit", ## this is for link the arearange series to this one and have one legend
     lineWidth = 1,
     showInLegend = TRUE
-    ) %>% 
+  ) %>%
   hc_add_series(
     fit,
     type = "arearange",
     name = "SE",
-    hcaes(x = speed, low = .fitted - qtint*.se, high = .fitted + qtint*.se),
+    hcaes(x = speed, low = .fitted - qtint * .se, high = .fitted + qtint * .se),
     linkedTo = "fit", ## here we link the legends in one.
     showInLegend = FALSE,
-    color = hex_to_rgba("gray", 0.2),  ## put a semi transparent color
+    color = hex_to_rgba("gray", 0.2), ## put a semi transparent color
     zIndex = -3 ## this is for put the series in a back so the points are showed first
-    )
-
+  )
 ```
 
-
+## mixed plot types
 
 ```{r}
 data(favorite_bars)
@@ -289,1589 +2551,21 @@ highchart() %>%
 
 ```
 
-```{r}
 
-n <- 6
-
-set.seed(123)
-
-colors <- c("#d35400", "#2980b9", "#2ecc71", "#f1c40f", "#2c3e50", "#7f8c8d")
-colors2 <- c("#000004", "#3B0F70", "#8C2981", "#DE4968", "#FE9F6D", "#FCFDBF")
-
-df <- data.frame(x = seq_len(n) - 1) %>% 
-  mutate(
-    y = 10 + x + 10 * sin(x - 1),
-    z = 5 + (x*y) - median(x*y),
-    e = 10 * abs(rnorm(length(x))) + 2,
-    e = round(e, 1),
-    low = y - e,
-    high = y + e,
-    value = round(y - 1),
-    name = sample(fruit[str_length(fruit) <= 5], size = n),
-    color = rep(colors, length.out = n)
-  ) %>% 
-  mutate_if(is.numeric, round, 1) %>% 
-  select(-e)
-
-catch_all_data <- df %>% 
-  mutate(
-    # label = name,
-    from = name[c(1, 1, 1, 2, 3, 4)],
-    to   = name[c(3, 4, 5, 3, 6, 6)],
-    weight = c(1, 1, 1, 1, 2, 2)
-  )
-
-```
-
-## arcdiagram
-
-Arc diagram series is a chart drawing style in which the vertices of the chart are positioned along a line on the Euclidean plane and the edges are drawn as a semicircle in one of the two half-planes delimited by the line, or as smooth curves formed by sequences of semicircles.
-
-
-```{r,eval=FALSE}
-
-tibble(from = sample(letters),to = sample(letters[1:10],26,replace = TRUE),weight = sample(1:5,26,replace = TRUE)) %>%
-  rowid_to_column() %>% 
-  split(.$rowid) %>% 
-  map(~{
-    
-    tibble(from = .x$from, to = .x$to, weight = .x$weight)
-  }) %>% 
-  highcharter::list_parse2() -> arc_data
-
-tibble(from = sample(letters),to = sample(letters[1:10],26,replace = TRUE),weight = sample(1:5,26,replace = TRUE)) -> arc_data 
-arc_data %>% 
-  rowid_to_column() %>% 
-  split(.$rowid) %>% 
-  map(~{
-    list(.x$from,.x$to,.x$weight)
-  }) -> arc_data
-
-# arc_data %>% 
-#   list_parse() %>% jsonlite::toJSON(pretty = TRUE)
-
-
-
-hchart(arc_data,"arcdiagram",hcaes(from = from,to = to,weight = weight)) %>% 
-  hc_add_dependency("modules/arc-diagram.js")
-
-
-highchart() %>%
-  hc_add_series(
-# series = list(
-      data = unname(arc_data) %>% jsonlite::toJSON(auto_unbox = TRUE),
-      keys = c("from", "to", "weight"),
-      type = "arcdiagram",
-      name = "Train connections",
-      linkWeight = 1,
-      centeredLinks = TRUE,
-      dataLabels = list(
-        rotation = 90,
-        y = 30,
-        align = "left",
-        color = "black"
-      ),
-      offset = "65%"
-
-    # )
-  ) %>%
-  hc_add_dependency("modules/arc-diagram.js")
-# hc_add_dep
-
-
-```
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/arc-diagram/" target="_blank">arc-diagram</a></div>
-</div>
-
-``` 
-
-
-
-## area
-
-The area series type.
-
-```{r}
-economics_long %>% 
-  hchart("area",hcaes(date,value01,group = variable))
-
-
-
-```
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/area-basic/" target="_blank">area-basic</a></div>
-</div>
-
-``` 
-
-
-
-## arearange
-
-The area range series is a carteseian series with higher and lower values foreach point along an X axis, where the area between the values is shaded.
-
-```{r}
-jsonlite::fromJSON("https://cdn.jsdelivr.net/gh/highcharts/highcharts@v7.0.0/samples/data/range.json") -> area_range_data
-
-# area_range_data
-
-highchart() %>% 
-  hc_add_series(data = as_tibble(area_range_data) %>% list_parse2(),type = "arearange") %>% 
-  hc_xAxis(
-    type = "datetime"
-  ) %>% 
-  hc_title(
-    text = "Temperature variation by day"
-  )
-  
-```
-
-
-
-```{=html}
-
-
-
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/arearange/" target="_blank">arearange</a></div>
-</div>
-
-``` 
-
-
-
-## areaspline
-
-
-The area spline series is an area series where the graph between thepoints is smoothed into a spline.
-
-```{r}
-moose_and_deer <- tibble(
-  year = c(2000:2020),
-  Moose = c(
-    38000, 37300, 37892, 38564, 36770, 36026, 34978, 35657, 35620, 35971, 36409, 36435, 34643, 34956, 33199, 31136, 30835, 31611, 30666, 30319, 31766
-  ), Deer = c(
-    22534, 23599, 24533, 25195, 25896, 27635, 29173, 32646, 35686, 37709, 39143, 36829, 35031, 36202, 35140, 33718, 37773, 42556, 43820, 46445, 50048
-  )
-) %>% 
-  gather(key,value,-year)
-
-
-
-hchart(moose_and_deer,"areaspline",hcaes(x = year,y = value,group = key )) %>% 
-  hc_legend(
-    layout = "vertical",
-    align = "left", verticalAlign = "top",
-    x = 120, y = 70, floating  = TRUE,
-    backgroundColor = "var(--accent-color)",
-    labels = list(style = list(color = "var(--page-background)"))
-  ) %>% 
-  hc_title(text = "Moose and deer hunting in Norway 2000-2021") %>%
-  hc_subtitle(text="Source:SSB")
-
-
-
-
-```
-
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/areaspline/" target="_blank">areaspline</a></div>
-</div>
-
-``` 
-
-
-
-## bar
-
-A bar series is a special type of column series where the columns arehorizontal.
-
-```{r}
-palmerpenguins::penguins %>%
-  group_by(species) %>%
-  summarize(flipper_length = mean(flipper_length_mm, na.rm = TRUE)) %>% 
-  hchart("bar",hcaes(species,flipper_length,color = I(viridis::viridis(3)))) %>%
-  hc_title(text = "Average Flipper Length by Penguin Species") 
-
-
-```
-
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/bar-basic/" target="_blank">bar-basic</a></div>
-</div>
-
-``` 
-
-
-
-## bellcurve
-
-A bell curve is an areaspline series which represents the probabilitydensity function of the normal distribution. It calculates mean andstandard deviation of the base series data and plots the curve accordingto the calculated parameters.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/bellcurve/" target="_blank">bellcurve</a></div>
-</div>
-
-``` 
-
-
-
-## boxplot
-
-A box plot is a convenient way of depicting groups of data through theirfive-number summaries: the smallest observation (sample minimum), lowerquartile (Q1), median (Q2), upper quartile (Q3), and largest observation(sample maximum).
-
-```{r}
-
-# hchart()
-
-```
-
-
-```{r,eval=FALSE}
-
-c(3.5, 3, 3.2, 3.1, 3.6, 3.9, 3.4, 3.4, 2.9, 3.1, 3.7, 3.4, 3, 3, 4,
-    4.4, 3.9, 3.5, 3.8, 3.8, 3.4, 3.7, 3.6, 3.3, 3.4, 3, 3.4, 3.5, 3.4, 3.2,
-    3.1, 3.4, 4.1, 4.2, 3.1, 3.2, 3.5, 3.6, 3, 3.4, 3.5, 2.3, 3.2, 3.5, 3.8, 3,
-    3.8, 3.2, 3.7, 3.3, 3.2, 3.2, 3.1, 2.3, 2.8, 2.8, 3.3, 2.4, 2.9, 2.7, 2, 3,
-    2.2, 2.9, 2.9, 3.1, 3, 2.7, 2.2, 2.5, 3.2, 2.8, 2.5, 2.8, 2.9, 3, 2.8, 3,
-    2.9, 2.6, 2.4, 2.4, 2.7, 2.7, 3, 3.4, 3.1, 2.3, 3, 2.5, 2.6, 3, 2.6, 2.3,
-    2.7, 3, 2.9, 2.9, 2.5, 2.8, 3.3, 2.7, 3, 2.9, 3, 3, 2.5, 2.9, 2.5, 3.6,
-    3.2, 2.7, 3, 2.5, 2.8, 3.2, 3, 3.8, 2.6, 2.2, 3.2, 2.8, 2.8, 2.7, 3.3, 3.2,
-    2.8, 3, 2.8, 3, 2.8, 3.8, 2.8, 2.8, 2.6, 3, 3.4, 3.1, 3, 3.1, 3.1, 3.1, 2.7,
-    3.2, 3.3, 3, 2.5, 3, 3.4, 3) %>% 
-  {
-    dat <- .
-    highchart() %>% 
-      hc_add_series(data = dat,type = "bellcurve")%>% 
-     hc_add_dependency("modules/histogram-bellcurve.js")
-  } 
-
- ## %>% 
- ##  hchart("boxplot",hcaes(x = group,y = n, group = group))
-
-
-```
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/box-plot/" target="_blank">box-plot</a></div>
-</div>
-
-``` 
-
-
-
-## bubble
-
-```{r}
-structure(list(x = c(95, 86.5, 80.8, 80.4, 80.3, 78.4, 74.2, 
-73.5, 71, 69.2, 68.6, 65.5, 65.4, 63.4, 64), y = c(95, 102.9, 
-91.5, 102.5, 86.1, 70.1, 68.5, 83.1, 93.2, 57.6, 20, 126.4, 50.8, 
-51.8, 82.9), z = c(13.8, 14.7, 15.8, 12, 11.8, 16.6, 14.5, 10, 
-24.7, 10.4, 16, 35.3, 28.5, 15.4, 31.3), name = c("BE", "DE", 
-"FI", "NL", "SE", "ES", "FR", "NO", "UK", "IT", "RU", "US", "HU", 
-"PT", "NZ"), country = c("Belgium", "Germany", "Finland", "Netherlands", 
-"Sweden", "Spain", "France", "Norway", "United Kingdom", "Italy", 
-"Russia", "United States", "Hungary", "Portugal", "New Zealand"
-)), class = c("tbl_df", "tbl", "data.frame"), row.names = c(NA, 
--15L)) -> sugar_and_fat
-
-
-sugar_and_fat %>%
-  hchart(., "bubble", hcaes(x = x, y = y, z = z)) %>% 
-  hc_plotOptions(
-    series = list(
-      dataLabels = list(enabled = TRUE, format = "{point.name}")
-    )
-  ) %>% 
-  hc_tooltip(
-    headerFormat = "<table>",
-    pointFormat = paste(
-      '<tr><th colspan="2"><h3>{point.country}</h3></th></tr>',
-      "<tr><th>Fat intake:</th><td>{point.x}g</td></tr>",
-      "<tr><th>Sugar intake:</th><td>{point.y}g</td></tr>",
-      "<tr><th>Obesity (adults):</th><td>{point.z}%</td></tr>"
-    ),
-    footerFormat = "</table>",
-    useHTML = TRUE
-  ) %>% 
-  hc_xAxis(
-    plotLines = list(list(color = "var(--text-color)",dashStyle = "dot",value = 65,
-                          label = list(text = "Safe fat intake 65g/day",style = list(color = "var(--text-color)"),rotation = 0)))
-  ) %>%
-  hc_yAxis(
-    plotLines = list(list(color = "var(--text-color)",dashStyle = "dot",value = 50,
-                          label = list(text = "Safe sugar intake 50g/day",style = list(color = "var(--text-color)"),rotation = 0,align = "right")))
-  ) %>% 
-  hc_title(
-    text = "Sugar and fat intake per country"
-  ) %>% 
-  hc_subtitle(
-    text = "Source: Euromonitor and OECD"
-  ) 
-
-
-
-
-
-```
-
-
-
-A bubble series is a three dimensional series type where each pointrenders an X, Y and Z value. Each points is drawn as a bubble where theposition along the X and Y axes mark the X and Y values, and the size ofthe bubble relates to the Z value.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/bubble/" target="_blank">bubble</a></div>
-</div>
-
-``` 
-
-
-
-## bullet
-
-```{r}
-df <- data.frame(
-  y = sample(5:10),
-  target = sample(5:10),
-  x = LETTERS[1:6]
-  )
-
-hchart(df, "bullet", hcaes(x = x, y = y, target = target), color = "black") %>%
-  hc_chart(inverted = TRUE) %>%
-  hc_yAxis(
-    min = 0,
-    max = 10,
-    gridLineWidth = 0,
-    plotBands = list(
-      list(from = 0, to = 7, color = "#666"),
-      list(from = 7, to = 9, color = "#999"),
-      list(from = 9, to = 10, color = "#bbb")
-    )
-  ) %>%
-  hc_xAxis(
-    gridLineWidth = 15,
-    gridLineColor = "white"
-  ) %>% 
-  hc_plotOptions(
-    series = list(
-      pointPadding = 0.25,
-      pointWidth = 15,
-      borderWidth = 0,
-      targetOptions = list(width = '200%')
-      )
-    )
-```
-
-
-
-A bullet graph is a variation of a bar graph. The bullet graph featuresa single measure, compares it to a target, and displays it in the contextof qualitative ranges of performance that could be set usingplotBands on yAxis.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/bullet-graph/" target="_blank">bullet-graph</a></div>
-</div>
-
-``` 
-
-
-
-## column
-
-Column series display one column per value along an X axis.
-
-
-```{r}
-
-diamonds %>% 
-  group_by(cut,clarity) %>% 
-  summarize(price = mean(price,na.rm=TRUE)) %>% 
-  ungroup() %>% 
-  hchart("column",hcaes(cut,price,group = clarity))
-
-
-```
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/column-basic/" target="_blank">column-basic</a></div>
-</div>
-
-``` 
-
-
-
-## columnpyramid
-
-Column pyramid series display one pyramid per value along an X axis.To display horizontal pyramids, set chart.inverted totrue.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/column-pyramid/" target="_blank">column-pyramid</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/columnpyramid-stacked/" target="_blank">columnpyramid-stacked</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/columnpyramid-inverted/" target="_blank">columnpyramid-inverted</a></div>
-</div>
-
-``` 
-
-
-
-## columnrange
-
-
-```{r}
-structure(list(name = "Temperatures", data = list(structure(c(-13.9, -16.7, -4.7, -4.4, -2.1, 5.9, 6.5, 4.7, 4.3, -3.5, -9.8, -11.5, 5.2, 10.6, 11.6, 16.8, 27.2, 29.4, 29.1, 25.4, 21.6, 15.1, 12.5, 8.4), .Dim = c(12L, 2L)))), class = "data.frame", row.names = 1L) %>% pull(data) %>% as.data.frame() %>% list_parse2() %>% 
-  hchart(type = "columnrange") %>% 
-  hc_xAxis(categories = month.abb) %>% 
-  hc_chart(inverted = TRUE) %>% 
-  hc_plotOptions(columnrange = list(dataLabels = list(
-  enabled = TRUE,
-  format = "{y}°C"
-))) %>% 
-  hc_legend(enabled = FALSE) %>% 
-  hc_title(text = "Temperature variation by month") %>% 
-  hc_subtitle(text = "Observed in Vik i Sogn, Norway, 2021 | Source: <a href=\"https://www.vikjavev.no/ver/\" target=\"_blank\">Vikjavev</a>")
-
-
-
-```
-
-
-
-The column range is a cartesian series type with higher and lowerY values along an X axis. To display horizontal bars, setchart.inverted to true.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/columnrange/" target="_blank">columnrange</a></div>
-</div>
-
-``` 
-
-
-
-## cylinder
-
-A cylinder graph is a variation of a 3d column graph. The cylinder graphfeatures cylindrical points.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/cylinder/" target="_blank">cylinder</a></div>
-</div>
-
-``` 
-
-
-
-## dependencywheel
-
-A dependency wheel chart is a type of flow diagram, where all nodes arelaid out in a circle, and the flow between the are drawn as link bands.
-
-```{r}
-arc_data <- structure(list(from = c("Hamburg", "Hamburg", "Hamburg", "Hannover", 
-"Hannover", "Berlin", "Berlin", "Berlin", "Berlin", "Berlin", 
-"Berlin", "München", "München", "München", "München", "München", 
-"Stuttgart", "Frankfurt", "Frankfurt", "Frankfurt", "Frankfurt", 
-"Düsseldorf", "Düsseldorf", "Amsterdam", "Paris", "Paris", 
-"Paris", "Paris", "Paris", "Paris", "Paris", "Paris", "Paris", 
-"Nantes", "Bordeaux", "Nantes", "Milano", "Milano", "Milano", 
-"Milano", "Milano", "Milano", "Torino", "Venezia", "Roma", "Roma", 
-"Roma", "Catania"), to = c("Stuttgart", "Frankfurt", "München", 
-"Wien", "München", "Wien", "München", "Stuttgart", "Frankfurt", 
-"Köln", "Düsseldorf", "Düsseldorf", "Wien", "Frankfurt", "Köln", 
-"Amsterdam", "Wien", "Wien", "Amsterdam", "Paris", "Budapest", 
-"Wien", "Hamburg", "Paris", "Brest", "Nantes", "Bayonne", "Bordeaux", 
-"Toulouse", "Montpellier", "Marseille", "Nice", "Milano", "Nice", 
-"Lyon", "Lyon", "München", "Roma", "Bari", "Napoli", "Brindisi", 
-"Lamezia Terme", "Roma", "Napoli", "Bari", "Catania", "Brindisi", 
-"Milano"), weight = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
-1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
-1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)), class = c("tbl_df", 
-"tbl", "data.frame"), row.names = c(NA, -48L))
-
-highchart() %>% 
-  hc_add_series(
-    type = "dependencywheel",
-    data = list_parse(arc_data)
-  )
-
-```
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/dependency-wheel/" target="_blank">dependency-wheel</a></div>
-</div>
-
-``` 
-
-
-
-## dumbbell
-
-The dumbbell series is a cartesian series with higher and lower valuesfor each point along an X axis, connected with a line between thevalues.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/dumbbell/" target="_blank">dumbbell</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-dumbbell/styled-mode-dumbbell/" target="_blank">styled-mode-dumbbell</a></div>
-</div>
-
-``` 
-
-
-
-## dumbbell
-
-
-
-Requires highcharts-more.js and modules/dumbbell.js.
-
-```{r}
-
-tibble(
-  name = sample(letters,10),
-  high = rnorm(10),
-  low = rnorm(10)
-) %>% 
-  hchart("dumbbell",hcaes(x = name))
-
-
-```
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/dumbbell/" target="_blank">dumbbell</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-dumbbell/styled-mode-dumbbell/" target="_blank">styled-mode-dumbbell</a></div>
-</div>
-
-``` 
-
-
-
-## errorbar
-
-```{r}
-example_dat <- tibble(
-  Type = c("Human", "High-Elf", "Orc"), 
-  key = c("World1", "World2", "World3")
-  ) %>% 
-  expand.grid() %>% 
-  mutate(mean = runif(9, 5, 7)) %>% 
-  mutate(sd = runif(9, 0.5, 1)) 
-
-hchart(
-  example_dat, 
-  "column",
-  hcaes(x = key, y = mean, group = Type),
-  id = c("a", "b", "c")
-  ) %>%
-  
-  hc_add_series(
-    example_dat,
-    "errorbar", 
-    hcaes(y = mean, x = key, low = mean - sd, high = mean + sd, group = Type),
-    linkedTo = c("a", "b", "c"),
-    enableMouseTracking = TRUE,
-    showInLegend = FALSE
-    ) %>% 
-  
-  hc_plotOptions(
-    errorbar = list(
-      color = "black", 
-      # whiskerLength = 1,
-      stemWidth = 1
-    ) 
-  ) 
-```
-
-
-Error bars are a graphical representation of the variability of data andare used on graphs to indicate the error, or uncertainty in a reportedmeasurement.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/error-bar/" target="_blank">error-bar</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-errorbar/on-scatter/" target="_blank">on-scatter</a></div>
-</div>
-
-``` 
-
-
-
-## funnel
-
-```{r}
-
-structure(list(name = c("Website visits", "Downloads", "Requested price list", 
-"Invoice sent", "Finalized"), y = c(15654, 4064, 1987, 976, 846
-)), class = c("tbl_df", "tbl", "data.frame"), row.names = c(NA, 
--5L)) %>% 
-  hchart(type = "funnel")
-
-
-```
-
-
-Funnel charts are a type of chart often used to visualize stages in asales project, where the top are the initial stages with the mostclients. It requires that the modules/funnel.js file is loaded.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/funnel/" target="_blank">funnel</a></div>
-</div>
-
-``` 
-
-
-
-## funnel3d
-
-A funnel3d is a 3d version of funnel series type. Funnel charts area type of chart often used to visualize stages in a sales project,where the top are the initial stages with the most clients.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/funnel3d/" target="_blank">funnel3d</a></div>
-</div>
-
-``` 
-
-
-
-## funnel3d
-
-It requires that the highcharts-3d.js, cylinder.js andfunnel3d.js module are loaded.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/funnel3d/" target="_blank">funnel3d</a></div>
-</div>
-
-``` 
-
-
-
-## gauge
-
-Gauges are circular plots displaying one or more values with a dialpointing to values along the perimeter.
-
-```{r}
-col_stops <- data.frame(
-  q = c(0.15, 0.4, .8),
-  c = c('#55BF3B', '#DDDF0D', '#DF5353'),
-  stringsAsFactors = FALSE
-)
-
-highchart() %>%
-  hc_chart(type = "solidgauge") %>%
-  hc_pane(
-    startAngle = -90,
-    endAngle = 90,
-    background = list(
-      outerRadius = '100%',
-      innerRadius = '60%',
-      shape = "arc"
-    )
-  ) %>%
-  hc_tooltip(enabled = FALSE) %>% 
-  hc_yAxis(
-    stops = list_parse2(col_stops),
-    lineWidth = 0,
-    minorTickWidth = 0,
-    tickAmount = 2,
-    min = 0,
-    max = 100,
-    labels = list(y = 26, style = list(fontSize = "22px"))
-  ) %>%
-  hc_add_series(
-    data = 90,
-    dataLabels = list(
-      y = -50,
-      borderWidth = 0,
-      useHTML = TRUE,
-      style = list(fontSize = "40px")
-    )
-  ) %>% 
-  hc_size(height = 300)
-```
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/gauge-speedometer/" target="_blank">gauge-speedometer</a></div>
-</div>
-
-``` 
-
-
-
-## heatmap
-
-A heatmap is a graphical representation of data where the individualvalues contained in a matrix are represented as colors.
-
-
-```{r}
-economics_long %>% 
-  mutate(date = as_factor(as.character(date))) %>% 
-  hchart("heatmap",hcaes(x = date, y = variable,value = value01)) %>% 
-  hc_size(width = 900)
-
-```
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/heatmap/" target="_blank">heatmap</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/heatmap-canvas/" target="_blank">heatmap-canvas</a></div>
-</div>
-
-``` 
-
-
-
-## heatmap
-
-Requires modules/heatmap.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/heatmap/" target="_blank">heatmap</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/heatmap-canvas/" target="_blank">heatmap-canvas</a></div>
-</div>
-
-``` 
-
-
-
-## histogram
-
-A histogram is a column series which represents the distribution of thedata set in the base series. Histogram splits data into bins and showstheir frequencies.
-
-```{r}
-x <- diamonds$price
-hchart(x)
-hchart(density(x), type = "area", color = "#B71C1C", name = "Price")
-```
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/histogram/" target="_blank">histogram</a></div>
-</div>
-
-``` 
-
-
-
-## item
-
-An item chart is an infographic chart where a number of items are laidout in either a rectangular or circular pattern. It can be used tovisualize counts within a group, or for the circular pattern, typicallya parliament.
-
-```{r}
-df <- data.frame(
-  stringsAsFactors = FALSE,
-  name = c(
-    "The Left",
-    "Social Democratic Party",
-    "Alliance 90/The Greens",
-    "Free Democratic Party",
-    "Christian Democratic Union",
-    "Christian Social Union in Bavaria",
-    "Alternative for Germany"
-  ),
-  count = c(69, 153, 67, 80, 200, 46, 94),
-  col = c("#BE3075", "#EB001F", "#64A12D", "#FFED00",
-          "#000000", "#008AC5", "#009EE0"
-  ),
-  abbrv = c("DIE LINKE", "SPD", "GRÜNE", "FDP", "CDU", "CSU", "AfD")
-)
-
-hchart(
-  df,
-  "item",
-  hcaes(
-    name = name,
-    y = count,
-    label = abbrv,
-    color = col
-  ),
-  name = "Representatives",
-  showInLegend = TRUE,
-  size = "100%",
-  center = list("50%", "75%"),
-  startAngle = -100,
-  endAngle  = 100
-) %>%
-  hc_title(text = "Item chart with different layout") %>%
-  hc_legend(labelFormat = '{name} <span style="opacity: 0.4">{y}</span>')
-```
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/parliament-chart" target="_blank">parliament-chart</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-item/rectangular" target="_blank">rectangular</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-item/symbols" target="_blank">symbols</a></div>
-</div>
-
-``` 
-
-
-
-## item
-
-The circular layout has much in common with a pie chart. Many of the itemseries options, like center, size and data label positioning, areinherited from the pie series and don't apply for rectangular layouts.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/parliament-chart" target="_blank">parliament-chart</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-item/rectangular" target="_blank">rectangular</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-item/symbols" target="_blank">symbols</a></div>
-</div>
-
-``` 
-
-
-
-## line
-
-A line series displays information as a series of data points connected bystraight line segments.
-
-```{r}
-
-economics %>% 
-  hchart("line",hcaes(date,pce))
-
-```
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/line-basic/" target="_blank">line-basic</a></div>
-</div>
-
-``` 
-
-
-
-## lollipop
-
-The lollipop series is a carteseian series with a line anchored fromthe x axis and a dot at the end to mark the value.Requires highcharts-more.js, modules/dumbbell.js andmodules/lollipop.js.
-
-```{r}
-tibble(
-  name = sample(letters,10),
-  # high = rnorm(10),
-  low = rnorm(10)
-) %>% 
-  hchart("lollipop",hcaes(x = name)) %>% 
-  hc_add_dependency("modules/lollipop.js")
-```
-
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/lollipop/" target="_blank">lollipop</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-dumbbell/styled-mode-dumbbell/" target="_blank">styled-mode-dumbbell</a></div>
-</div>
-
-``` 
-
-
-
-## networkgraph
-
-A networkgraph is a type of relationship chart, where connnections(links) attracts nodes (points) and other nodes repulse each other.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/network-graph/" target="_blank">network-graph</a></div>
-</div>
-
-``` 
-
-
-
-## organization
-
-An organization chart is a diagram that shows the structure of anorganization and the relationships and relative ranks of its parts andpositions.
-
-
-```{r}
-tibble(from = sample(letters[1:3],10,replace = TRUE),to = sample(letters[1:10],10),weight = 1:10,id = 0:9) %>% 
-  hchart("organization") %>%
-  hc_chart(inverted = TRUE)
-  
-```
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/organization-chart/" target="_blank">organization-chart</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-organization/horizontal/" target="_blank">horizontal</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-organization/borderless" target="_blank">borderless</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-organization/center-layout" target="_blank">center-layout</a></div>
-</div>
-
-``` 
-
-
-
-## packedbubble
-
-A packed bubble series is a two dimensional series type, where each pointrenders a value in X, Y position. Each point is drawn as a bubblewhere the bubbles don't overlap with each other and the radiusof the bubble relates to the value.
-
-```{r}
-gapminder::gapminder %>%
-  filter(year == max(year)) %>%
-  hchart("packedbubble", hcaes(name = country, value = pop, z = pop, group = continent), dataLabels = list(enabled = TRUE, format = "{point.country}", filter = list(property = "y", operator = ">", value = 31210042))) %>%
-  hc_plotOptions(
-    packedbubble = list(
-      minSize = "30%", maxSize = "150%"
-    )
-  )
-
-
-
-
-
-hc <- gapminder::gapminder %>% 
-  filter(year == max(year)) %>% 
-  select(country, pop, continent) %>% hchart("packedbubble", hcaes(name = country, value = pop, group = continent))
-
-q95 <- as.numeric(quantile(gapminder::gapminder$pop, .95))
-
-hc %>% 
-  hc_tooltip(
-    useHTML = TRUE,
-    pointFormat = "<b>{point.name}:</b> {point.value}"
-  ) %>% 
-  hc_plotOptions(
-    packedbubble = list(
-      maxSize = "150%",
-      zMin = 0,
-      layoutAlgorithm = list(
-        gravitationalConstant =  0.05,
-        splitSeries =  TRUE, ## TRUE to group points
-        seriesInteraction = TRUE,
-        dragBetweenSeries = TRUE,
-        parentNodeLimit = TRUE
-      ),
-      dataLabels = list(
-        enabled = TRUE,
-        format = "{point.name}",
-        filter = list(
-          property = "y",
-          operator = ">",
-          value = q95
-        ),
-        style = list(
-          color = "black",
-          textOutline = "none",
-          fontWeight = "normal"
-        )
-      )
-    )
-  )  
-
-
-
-```
-
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/packed-bubble/" target="_blank">packed-bubble</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/packed-bubble-split/" target="_blank">packed-bubble-split</a></div>
-</div>
-
-``` 
-
-
-
-## pareto
-
-A pareto diagram is a type of chart that contains both bars and a linegraph, where individual values are represented in descending order bybars, and the cumulative total is represented by the line.
-
-```{r,eval=FALSE}
-
-catch_all_data %>% 
-  select(x,y) %>% 
-  hchart("pareto") %>% 
-  # hc_add_series(type = "pareto",baseSeries = 1L,
-  #               tooltip = list(valueDecimals = 2)) %>% 
-  hc_tooltip(shared = TRUE) %>% 
-  hc_add_dependency("modules/pareto.js")
-
-```
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/pareto/" target="_blank">pareto</a></div>
-</div>
-
-``` 
-
-
-
-## pie
-
-```{r}
-library(scales)
-
-diamond_data <- count(diamonds, clarity)
-diamond_data <- mutate(diamond_data, porcentaje = percent(n/sum(n)))
-
-
-hchart(
-  diamond_data, "pie", hcaes(name = clarity, y = n),
-  name = "Corte",
-  innerSize = "80%",
-  dataLabels = list(format = "{point.name}<br>({point.porcentaje})")
-  ) -> hc
-hc
-
-hc%>% 
-  hc_tooltip(
-    useHTML = TRUE,
-    style = list(fontSize = "30px"),
-    headerFormat = "",
-    pointFormat = "<div style='text-align: center;'> <b>{point.name}</b><br>{point.y} <br>{point.porcentaje} </div>",
-    positioner = JS(
-      "function () {
-      
-        /* one of the most important parts! */
-        xp =  this.chart.chartWidth/2 - this.label.width/2
-        yp =  this.chart.chartHeight/2 - this.label.height/2
-      
-        return { x: xp, y: yp };
-      
-      }"),
-    shadow = FALSE,
-    borderWidth = 0,
-    backgroundColor = "transparent",
-    hideDelay = 1000
-    )
-
-```
-
-
-A pie chart is a circular graphic which is divided into slices toillustrate numerical proportion.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/pie-basic/" target="_blank">pie-basic</a></div>
-</div>
-
-``` 
-
-
-
-## polygon
-
-A polygon series can be used to draw any freeform shape in the cartesiancoordinate system. A fill is applied with the color option, andstroke is applied through lineWidth and lineColor options.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/polygon/" target="_blank">polygon</a></div>
-</div>
-
-``` 
-
-
-
-## pyramid
-
-A pyramid series is a special type of funnel, without neck and reversedby default.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/pyramid/" target="_blank">pyramid</a></div>
-</div>
-
-``` 
-
-
-
-## pyramid3d
-
-A pyramid3d is a 3d version of pyramid series type. Pyramid charts area type of chart often used to visualize stages in a sales project,where the top are the initial stages with the most clients.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/pyramid3d/" target="_blank">pyramid3d</a></div>
-</div>
-
-``` 
-
-
-
-## sankey
-
-
-
-A sankey diagram is a type of flow diagram, in which the width of thelink between two nodes is shown proportionally to the flow quantity.
-
-```{r}
-data(diamonds, package = "ggplot2")
-diamonds2 <- select(diamonds, cut, color, clarity)
-data_to_sankey(diamonds2)
-
-
-
-hchart(data_to_sankey(diamonds2), "sankey", name = "diamonds")
-```
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/sankey-diagram/" target="_blank">sankey-diagram</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/sankey-inverted/" target="_blank">sankey-inverted</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/sankey-outgoing" target="_blank">sankey-outgoing</a></div>
-</div>
-
-``` 
-
-
-
-## scatter
-
-```{r}
-hchart(sample_n(diamonds,1000),"scatter",hcaes(carat,price,group = clarity))
-
-```
-
-
-A scatter plot uses cartesian coordinates to display values for twovariables for a set of data.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/scatter/" target="_blank">scatter</a></div>
-</div>
-
-``` 
-
-
-
-## scatter3d
-
-A 3D scatter plot uses x, y and z coordinates to display values for threevariables for a set of data.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/3d/scatter/" target="_blank">scatter</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/3d-scatter-draggable" target="_blank">3d-scatter-draggable</a></div>
-</div>
-
-``` 
-
-
-
-## solidgauge
-
-A solid gauge is a circular gauge where the value is indicated by a filledarc, and the color of the arc may variate with the value.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/gauge-solid/" target="_blank">gauge-solid</a></div>
-</div>
-
-``` 
-
-
-
-## spline
-
-A spline series is a special type of line series, where the segmentsbetween the data points are smoothed.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/spline-irregular-time/" target="_blank">spline-irregular-time</a></div>
-</div>
-
-``` 
-
-
-
-## streamgraph
-
-A streamgraph is a type of stacked area graph which is displaced around acentral axis, resulting in a flowing, organic shape.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/streamgraph/" target="_blank">streamgraph</a></div>
-</div>
-
-``` 
-
-
-
-## sunburst
-
-A Sunburst displays hierarchical data, where a level in the hierarchy isrepresented by a circle. The center represents the root node of the tree.The visualization bears a resemblance to both treemap and pie charts.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/sunburst" target="_blank">sunburst</a></div></div>
-</div>
-
-``` 
-
-```{r}
-library(dplyr)
-data(gapminder, package = "gapminder")
-
-gapminder_2007 <- gapminder::gapminder %>%
-  filter(year == max(year)) %>%
-  mutate(pop_mm = round(pop / 1e6))
-
-dout <- data_to_hierarchical(gapminder_2007, c(continent, country), pop_mm)
-
-hchart(dout, type = "sunburst")
-
-```
-
-
-## tilemap
-
-A tilemap series is a type of heatmap where the tile shapes areconfigurable.
-
-```{r}
-structure(list(`hc-a2` = c("AL", "AK", "AZ", "AR", "CA", "CO", 
-"CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", 
-"KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", 
-"NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", 
-"RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", 
-"WY"), name = c("Alabama", "Alaska", "Arizona", "Arkansas", "California", 
-"Colorado", "Connecticut", "Delaware", "District of Columbia", 
-"Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", 
-"Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", 
-"Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", 
-"Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", 
-"New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", 
-"Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", 
-"South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", 
-"Washington", "West Virginia", "Wisconsin", "Wyoming"), region = c("South", 
-"West", "West", "South", "West", "West", "Northeast", "South", 
-"South", "South", "South", "West", "West", "Midwest", "Midwest", 
-"Midwest", "Midwest", "South", "South", "Northeast", "South", 
-"Northeast", "Midwest", "Midwest", "South", "Midwest", "West", 
-"Midwest", "West", "Northeast", "Northeast", "West", "Northeast", 
-"South", "Midwest", "Midwest", "South", "West", "Northeast", 
-"Northeast", "South", "Midwest", "South", "South", "West", "Northeast", 
-"South", "West", "South", "Midwest", "West"), x = c(6, 0, 5, 
-5, 5, 4, 3, 4, 4, 8, 7, 8, 3, 3, 3, 3, 5, 4, 6, 0, 4, 2, 2, 2, 
-6, 4, 2, 4, 4, 1, 3, 6, 2, 5, 2, 3, 6, 4, 3, 2, 6, 3, 5, 7, 5, 
-1, 5, 2, 4, 2, 3), y = c(7, 0, 3, 6, 2, 3, 11, 9, 10, 8, 8, 0, 
-2, 6, 7, 5, 5, 6, 5, 11, 8, 10, 7, 4, 6, 5, 2, 4, 2, 11, 10, 
-3, 9, 9, 3, 8, 4, 1, 9, 11, 8, 4, 7, 4, 4, 10, 8, 1, 7, 5, 3), 
-    value = c(4849377, 737732, 6745408, 2994079, 39250017, 5540545, 
-    3596677, 935614, 7288000, 20612439, 10310371, 1419561, 1634464, 
-    12801539, 6596855, 3107126, 2904021, 4413457, 4649676, 1330089, 
-    6016447, 6811779, 9928301, 5519952, 2984926, 6093000, 1023579, 
-    1881503, 2839099, 1326813, 8944469, 2085572, 19745289, 10146788, 
-    739482, 11614373, 3878051, 3970239, 12784227, 1055173, 4832482, 
-    853175, 6651194, 27862596, 2942902, 626011, 8411808, 7288000, 
-    1850326, 5778708, 584153)), class = c("tbl_df", "tbl", "data.frame"
-), row.names = c(NA, -51L)) -> tile_map_usa
-
-
-hchart(tile_map_usa, "tilemap",dataLabels = list(enabled = TRUE, format = "{point.hc-a2}")) %>%
-  hc_chart(inverted = TRUE) %>%
-  hc_colorAxis(
-    dataClasses = list_parse(bind_rows(c(
-      from = 0,
-      to = 1000000,
-      color = "#F9EDB3",
-      name = "< 1M"
-    ), c(
-      from = 1000000,
-      to = 5000000,
-      color = "#FFC428",
-      name = "1M - 5M"
-    ), c(
-      from = 5000000,
-      to = 20000000,
-      color = "#FF7987",
-      name = "5M - 20M"
-    ), c(
-      from = 20000000,
-      color = "#FF2371",
-      name = "> 20M"
-    )))
-  ) %>% 
-  hc_title(
-    text = "U.S. states by population in 2016"
-  ) %>% 
-  hc_subtitle(
-    text = "Source: Wikipedia"
-  ) %>% 
-  hc_size(width = 600,height = 600)
-
-```
-
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/honeycomb-usa/" target="_blank">honeycomb-usa</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/maps/plotoptions/honeycomb-brazil/" target="_blank">honeycomb-brazil</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/maps/plotoptions/honeycomb-china/" target="_blank">honeycomb-china</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/maps/plotoptions/honeycomb-europe/" target="_blank">honeycomb-europe</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/maps/demo/circlemap-africa/" target="_blank">circlemap-africa</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/maps/demo/diamondmap" target="_blank">diamondmap</a></div>
-</div>
-
-``` 
-
-
-
-## timeline
-
-The timeline series presents given events along a drawn line.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-timeline/alternate-labels" target="_blank">alternate-labels</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-timeline/inverted" target="_blank">inverted</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-timeline/datetime-axis" target="_blank">datetime-axis</a></div>
-</div>
-
-``` 
-
-
-
-## treemap
-
-A treemap displays hierarchical data using nested rectangles. The datacan be laid out in varying ways depending on options.
-
-```{r}
-library(dplyr)
-data(gapminder, package = "gapminder")
-
-gapminder_2007 <- gapminder::gapminder %>%
-  filter(year == max(year)) %>%
-  mutate(pop_mm = round(pop / 1e6))
-
-dout <- data_to_hierarchical(gapminder_2007, c(continent, country), pop_mm)
-
-
-
-hchart(dout, type = "treemap")
-```
-
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/treemap-large-dataset/" target="_blank">treemap-large-dataset</a></div>
-</div>
-
-``` 
-
-
-
-## variablepie
-
-A variable pie series is a two dimensional series type, where each pointrenders an Y and Z value.  Each point is drawn as a pie slice where thesize (arc) of the slice relates to the Y value and the radius of pieslice relates to the Z value.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/variable-radius-pie/" target="_blank">variable-radius-pie</a></div>
-</div>
-
-``` 
-
-
-
-## variwide
-
-A variwide chart (related to marimekko chart) is a column chart with avariable width expressing a third dimension.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/variwide/" target="_blank">variwide</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-variwide/inverted/" target="_blank">inverted</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-variwide/datetime/" target="_blank">datetime</a></div>
-</div>
-
-``` 
-
-
-
-## vector
-
-A vector plot is a type of cartesian chart where each point has an X andY position, a length and a direction. Vectors are drawn as arrows.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/vector-plot/" target="_blank">vector-plot</a></div>
-</div>
-
-``` 
-
-
-
-## venn
-
-A Venn diagram displays all possible logical relations between acollection of different sets. The sets are represented by circles, andthe relation between the sets are displayed by the overlap or lack ofoverlap between them. The venn diagram is a special case of Eulerdiagrams, which can also be displayed by this series type.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/venn-diagram/" target="_blank">venn-diagram</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/euler-diagram/" target="_blank">euler-diagram</a></div>
-</div>
-
-``` 
-
-
-
-## waterfall
-
-A waterfall chart displays sequentially introduced positive or negativevalues in cumulative columns.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/waterfall/" target="_blank">waterfall</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/waterfall-inverted/" target="_blank">waterfall-inverted</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/waterfall-stacked/" target="_blank">waterfall-stacked</a></div>
-</div>
-
-``` 
-
-
-
-## windbarb
-
-Wind barbs are a convenient way to represent wind speed and direction inone graphical form. Wind direction is given by the stem direction, andwind speed by the number and shape of barbs.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/windbarb-series/" target="_blank">windbarb-series</a></div>
-</div>
-
-``` 
-
-
-
-## wordcloud
-
-A word cloud is a visualization of a set of words, where the size andplacement of a word is determined by how it is weighted.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/wordcloud" target="_blank">wordcloud</a></div>
-</div>
-
-``` 
-
-
-
-## xrange
-
-The X-range series displays ranges on the X axis, typically timeintervals with a start and end date.
-
-```{=html}
-
-<div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/x-range/" target="_blank">x-range</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/css/x-range/" target="_blank">x-range</a></div>
-  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/chart/inverted-xrange/" target="_blank">inverted-xrange</a></div>
-</div>
-
-``` 
-
-
-
-
-## extra
-
-
-
-### simulating arima
+## simulating arima
 
 ```{r}
 
 library(highcharter)
 library(stringr)
-sim_ar_hc <- function(ar = c(0.3, 0.2), time = 1){
-  
-   # the first values of the model
+sim_ar_hc <- function(ar = c(0.3, 0.2), time = 1) {
+
+  # the first values of the model
   ts <- as.vector(arima.sim(model = list(ar = ar), n = 10))
   ts <- round(ts, 3)
   ts
-  
-load_fn <- "function () {{
+
+  load_fn <- "function () {{
 	dot = (a, b) => a.map((x, i) => a[i] * b[i]).reduce((m, n) => m + n);
   function randn_bm() {{
   	var u = 0, v = 0;
@@ -1879,47 +2573,47 @@ load_fn <- "function () {{
     while(v === 0) v = Math.random();
     return Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
    }}
-  
+
 	var dat = [{ data }];
   var ar = [{ ar }];
   dat = dat.slice(-ar.length);
-  
+
   // set up the updating of the chart each second
   var series = this.series[0];
-  
+
   setInterval(function () {{
-      
+
       //console.log(dat);
       var new_value = dot(dat, ar) + randn_bm();
       new_value = Math.round(1000 * new_value)/1000
       //console.log(new_value)
-      dat.shift(); 
+      dat.shift();
       dat.push(new_value);
-      series.addPoint([new_value]);  
-      
+      series.addPoint([new_value]);
+
       //if (series.data.length < 500) {{
       //  series.addPoint([new_value], true, false);
       //}} else {{
       //  series.addPoint([new_value], true, true);
       //}}
-      
+
   }}, { time });
-  
+
 }}"
-  
+
   load_fn_glued <- str_glue(
     load_fn,
     data = str_c(ts, collapse = ","),
     ar = str_c(ar, collapse = ","),
     time = time * 1000
   )
-  
-  tick_post_fn <- "function(min,max){        
+
+  tick_post_fn <- "function(min,max){
     var data = this.chart.yAxis[0].series[0].processedYData;
     //last point
-    return [Math.round(1000 * data[data.length-1])/1000]; 
+    return [Math.round(1000 * data[data.length-1])/1000];
   }"
-  
+
   rm_poinst_fn <- "function () {
     for (var i = 1; i <= 500; i++) {
       if (this.series[0].data.length) {
@@ -1927,27 +2621,25 @@ load_fn <- "function () {{
       }
     }
   }"
-    
-  formula <- purrr::map2(ar, seq_along(ar), function(par, t){
-    
-    if(par > 0 & t > 1) {
+
+  formula <- purrr::map2(ar, seq_along(ar), function(par, t) {
+    if (par > 0 & t > 1) {
       par <- str_c("+ ", par)
     }
-    
+
     htmltools::tagList(par, "×", "X", tags$sub(stringr::str_glue("t - { i }", i = t)))
-    
-  }) 
-  
+  })
+
   formula <- purrr::reduce(formula, htmltools::tagList)
-  
-  formula <- str_c("X", tags$sub("t") %>% as.character(), " = ",formula %>% as.character(), " + &epsilon;",  tags$sub("t") %>% as.character())
-  
-  hc <- highchart() %>% 
-    hc_add_series(data = ts, name = "Process") %>% 
+
+  formula <- str_c("X", tags$sub("t") %>% as.character(), " = ", formula %>% as.character(), " + &epsilon;", tags$sub("t") %>% as.character())
+
+  hc <- highchart() %>%
+    hc_add_series(data = ts, name = "Process") %>%
     hc_chart(
-      events = list(load = JS(load_fn_glued)), 
-      animation = list(duration = time*1000/2)
-      ) %>%
+      events = list(load = JS(load_fn_glued)),
+      animation = list(duration = time * 1000 / 2)
+    ) %>%
     hc_title(text = "Autoregressive process") %>%
     hc_subtitle(text = formula, useHTML = TRUE) %>%
     hc_plotOptions(series = list(marker = list(enabled = FALSE))) %>%
@@ -1957,20 +2649,20 @@ load_fn <- "function () {{
       enabled = TRUE,
       buttons = list(
         list(
-          text =  "Remove last 500 values",
+          text = "Remove last 500 values",
           onclick = JS(rm_poinst_fn),
-          theme = list(stroke = 'silver')
-          )
+          theme = list(stroke = "silver")
         )
-      ) %>%
+      )
+    ) %>%
     hc_yAxis_multiples(
       # default axis
       list(
         title = list(text = ""),
         plotLines = list(
           list(value = 0, width = 2, color = "#AAA", zIndex = 1)
-          )
-        ),
+        )
+      ),
       # opposite axis
       list(
         title = list(text = ""),
@@ -1985,375 +2677,18 @@ load_fn <- "function () {{
       series = list(type = "line"),
       xAxis = list(labels = list(enabled = FALSE), width = "95%")
     )
-  
+
   hc
-  
 }
 
 
 
 sim_ar_hc()
-
-```
-
-### code src
-
-```{r,eval = FALSE}
-library(highcharter)
-library(tidyverse)
-
-hcExamples
-
-hcExamples %>% 
-  split(.$text) %>% 
-  map(~{
-    
- unique(.x$example) %>% 
-      map(~{tags$a(basename(.x),href = .x,target = '_blank')}) %>% 
-      div() %>% as.character() -> examples_out
-    
-    glue::glue(
-      "## {unique(.x$text)}
-      
-      {unique(.x$desc)}
-      
-      ```{{=html}}
-      
-      {examples_out}
-      
-      ```
-      
-            
-            "
-    ) %>% 
-      str_trim()
-    
-  }) %>% 
-  
-  unlist() %>% 
-  paste(collaspe = "\n\n\n") %>%
-  clipr::write_clip()
-  
-  map(~{
-    div(
-      h1(unique(.x$text))
-    )
-  }) %>% 
-  div()
-  
-
-  map(~{
-
-  header <- unique(.x$text)
-  descrip <- unique(.x$desc)
-  examples <- unique(.x$example)
-  links <- unique(.x$example)
-  list_unique <-
-      .x %>% lapply(unique)
-
-
-
-
-    div(
-      h1(list_unique$text),
-      p(list_unique$text),
-      lapply(links_unique(tags$a(href  = .)
-    )
-
-    .x %>%
-      div(h1(unique(.x$text)),p(unique(.x$desc)),unique(.x$example) %>% map(~{tags$a(href = .x,target = "blank_")}))
-  })
-
-```
-
-### js files
-
-```{r,eval=FALSE}
-path.expand("~/html_projects/highcharts-master/samples/highcharts/demo/") -> base_dir
-
-list.files(base_dir) %>% 
-  map_dfr(~{
-    file.path(base_dir,.x) %>% 
-      list.files() %>% 
-      tibble(files = .) %>% 
-      mutate(group = .x)
-  }) %>% 
-  ungroup() %>% 
-  filter(tools::file_ext(files)=="js") %>% 
-  rowwise() %>% 
-  mutate(
-    lines = map2(group,files,~{
-      read_lines(file.path(base_dir,.x,.y)) %>%
-      paste(collapse = "\n") %>% 
-      prettifyAddins::prettify_V8(language = "javascript") %>% 
-        str_split("\n") %>% unlist() %>% tibble(code_line = .)
-      })
-  ) -> js_files
-
-
-
-readr::read_lines("inst/highcharts.Rmd") %>%
-  tibble(line = .) %>%
-  filter(str_detect(line, "href=")) %>%
-  mutate(group = stringr::str_extract(line, "demo/[a-zA-Z-]+/")) %>%
-  select(group) %>% 
-  mutate(group = stringr::str_remove_all(group,"demo\\/|\\/")) %>% 
-  inner_join(js_files) %>%
-  unique() %>% 
-  split(.$group) -> js_examples
-
-
-
-
-
-c("title","series",  "yAxis",  "chart", "xAxis", 
-"tooltip",  "plotOptions", "subtitle", "name", "legend", 
-"accessibility",  "colors", "credits", "responsive", 
-"exporting", "colorAxis", "id", "marker",
-"annotations", "boost", "caption","data"
-) -> group_keys
-
-js_examples %>%
-  map_dfr(~ {
-    unnest(.x, lines) %>%
-      mutate(group_level = (stringr::str_length(code_line) - stringr::str_length(code_line %>% stringr::str_trim())) %>% dense_rank())
-  }) %>%
-  filter(group_level != 1) %>%
-  # filter(group_level == 2) %>% 
-  rowwise() %>%
-  mutate(code_group = stringr::str_split(code_line, ":") %>% unlist() %>% .[[1]] %>% str_trim()) %>%
-  mutate(code_group = case_when(code_group %in% group_keys & group_level == 2 ~ code_group,TRUE ~ NA_character_)) %>% 
-  ungroup() %>% 
-  fill(code_group) %>%
-  mutate(code_line = case_when(
-    group_level == 2 ~ str_replace(code_line,paste0(code_group,":"),glue::glue("{code_group} =")), TRUE ~ code_line
-  )) -> group_code 
- 
-
-ctx <- V8::v8()
-
-parse_code <- function(x){
-      x %>%
-      split(.$code_group) %>%
-      imap(~ {
-        .x <- .x %>%
-          mutate(code_line = case_when(
-            row_number() == max(row_number()) & str_sub(code_line, -1L, -1L) == "," ~ str_sub(code_line, 1, -2L), TRUE ~ code_line
-          ))
-
-        ctx$eval(JS(pull(.x, code_line) %>% paste(collapse = "")))
-        ctx$eval(glue::glue("console.r.assign('eval_js_example',JSON.stringify({unique(.x$code_group)}))"))
-
-        jsonlite::fromJSON(eval_js_example)
-      }) %>%
-      imap(~ {
-        out_str <- glue::glue("hc_{.y}({capture.output(dput(.x)) %>% paste(collapse = '')})")
-        if(!.y %in% c("series","colors")){
-          out_str <- out_str %>% stringr::str_replace_all(",",",\n")
-        }
-        
-        if(str_detect(out_str,glue::glue("hc_{.y}\\(list\\("))){
-
-            out_str %>%
-          stringr::str_remove("list\\(") %>%
-          stringi::stri_reverse() %>% stringr::str_remove("\\)") %>% stringi::stri_reverse()
-
-                    
-        }else{
-          out_str
-        }
-        
-      }) %>%
-      
-      styler::style_text()
-}
-
-parse_code_safely <- safely(parse_code)
-group_code %>%
-  # filter(group == "arc-diagram") %>% 
-  # print(n = nrow(.))
-  # filter(group == "bubble") %>%
-  split(.$group) %>%
-  map(~ {
-    # print(.x)
-    out_res <- parse_code_safely(.x)$result
-    out_res
-  }) -> out_code
-  
-out_code %>% 
-imap(~{
-  
-  if(!is.null(.x)){
-    code_lines <- paste(.x,collapse = "\n")
-      glue::glue(
-        "### {.y}
-
-        ```{{r,eval = FALSE}}
-
-        {code_lines}
-
-        ```\n\n"
-      )
-    
-  }
-  }) %>% 
-  unlist() %>% 
-  clipr::write_clip()
-
-
-
-
-
-
-```
-
-
-### JS example print
-
-```{r,eval = FALSE}
-
-js_examples %>% 
-  map(~{
-    print(.x)
-    code_lines <- pull(.x,lines) %>% unlist() %>% as_tibble()
-    code_chunk <- paste(collapse = "\n",code_lines$value)
-    print(length(code_chunk))
-    
-    htmltools::tags$div(
-      htmltools::tags$h1(.x$group),
-        htmltools::tags$pre(code_chunk)
-    )
-  }) %>% 
-  shiny::fluidPage() %>% 
-  htmltools::html_print()
-
-```
-
-
-```{r,eval = FALSE}
-library(highcharter)
-library(tidyverse)
-
-hcExamples
-
-hcExamples %>% 
-  split(.$text) %>% 
-  map(~{
-    
- unique(.x$example) %>% 
-      map(~{tags$a(basename(.x),href = .x,target = '_blank')}) %>% 
-      div() %>% as.character() -> examples_out
-    
-    glue::glue(
-      "## {unique(.x$text)}
-      
-      {unique(.x$desc)}
-      
-      ```{{=html}}
-      
-      {examples_out}
-      
-      ```
-      
-            
-            "
-    ) %>% 
-      str_trim()
-    
-  }) %>% 
-  
-  unlist() %>% 
-  paste(collaspe = "\n\n\n") %>%
-  clipr::write_clip()
-  
-  map(~{
-    div(
-      h1(unique(.x$text))
-    )
-  }) %>% 
-  div()
-  
-
-  map(~{
-
-  header <- unique(.x$text)
-  descrip <- unique(.x$desc)
-  examples <- unique(.x$example)
-  links <- unique(.x$example)
-  list_unique <-
-      .x %>% lapply(unique)
-
-    div(
-      h1(list_unique$text),
-      p(list_unique$text),
-      lapply(links_unique(tags$a(href  = .)
-    )
-
-    .x %>%
-      div(h1(unique(.x$text)),p(unique(.x$desc)),unique(.x$example) %>% map(~{tags$a(href = .x,target = "blank_")}))
-  })
-
-```
-
-```{r,eval=FALSE}
-path.expand("~/html_projects/highcharts-master/samples/highcharts/demo/") -> base_dir
-
-list.files(base_dir) %>% 
-  map_dfr(~{
-    file.path(base_dir,.x) %>% 
-      list.files() %>% 
-      tibble(files = .) %>% 
-      mutate(group = .x)
-  }) %>% 
-  rowwise() %>% 
-  mutate(
-    lines = map2(group,files,~read_lines(file.path(base_dir,.x,.y)) %>% tibble(code_line = .))
-  ) %>% 
-  ungroup() %>% 
-  filter(tools::file_ext(files)=="js") -> js_files
-
-
-readr::read_lines("inst/highcharts.Rmd") %>% 
-  tibble(line = .) %>% 
-  filter(str_detect(line,"##"))
-
-readr::read_lines("inst/highcharts.Rmd") %>%
-  tibble(line = .) %>%
-  filter(str_detect(line, "href=")) %>%
-  mutate(group = stringr::str_extract(line, "demo/[a-zA-Z-]+/")) %>%
-  select(group) %>%
-  print(n = nrow(.))
 ```
 
 
 
-### helper funs
 
-
-
-```{r,include = FALSE,eval = FALSE}
-
-minify_clip <- function(){
-  clipr::read_clip() %>% paste(collapse = "\n") -> txt_in
-
-txt_in %>%
-  stringr::str_replace_all(",[ \t]+ ", ",") %>%
-  stringr::str_replace_all(",\n", ",") %>%
-  stringr::str_replace_all(",[ \t]+ ", ",") %>%
-  # stringr::str_replace_all(",\n", ",") %>%
-  cat() %>%
-  styler::style_text() %>%
-  clipr::write_clip()
-}
-
-parse_js <- function(){
-  clipr::read_clip() %>% str_replace_all("\\{","list(") %>% str_replace_all("\\}",")") %>% stringr::str_replace_all(":","=") %>% stringr::str_replace_all("\\[","bind_rows(") %>% stringr::str_replace_all("\\]",")") %>% paste(collapse = "\n") %>% styler::style_text()
-}
-
-```
-
-
-### page
 
 
 ```{css}
@@ -2396,5 +2731,216 @@ window.dispatchEvent(new Event('resize'));
 
 
 ```
+
+
+# Charts with conflicts
+
+These charts seem to run into javascript conflict errors when included with other highcharts plots, but otherwise are functional code. 
+
+## arcdiagram
+
+Arc diagram series is a chart drawing style in which the vertices of the chart are positioned along a line on the Euclidean plane and the edges are drawn as a semicircle in one of the two half-planes delimited by the line, or as smooth curves formed by sequences of semicircles.
+
+
+```{r,eval=FALSE}
+
+arc_data <- structure(list(from = c(
+  "Hamburg", "Hamburg", "Hamburg", "Hannover",
+  "Hannover", "Berlin", "Berlin", "Berlin", "Berlin", "Berlin",
+  "Berlin", "München", "München", "München", "München", "München",
+  "Stuttgart", "Frankfurt", "Frankfurt", "Frankfurt", "Frankfurt",
+  "Düsseldorf", "Düsseldorf", "Amsterdam", "Paris", "Paris",
+  "Paris", "Paris", "Paris", "Paris", "Paris", "Paris", "Paris",
+  "Nantes", "Bordeaux", "Nantes", "Milano", "Milano", "Milano",
+  "Milano", "Milano", "Milano", "Torino", "Venezia", "Roma", "Roma",
+  "Roma", "Catania"
+), to = c(
+  "Stuttgart", "Frankfurt", "München",
+  "Wien", "München", "Wien", "München", "Stuttgart", "Frankfurt",
+  "Köln", "Düsseldorf", "Düsseldorf", "Wien", "Frankfurt", "Köln",
+  "Amsterdam", "Wien", "Wien", "Amsterdam", "Paris", "Budapest",
+  "Wien", "Hamburg", "Paris", "Brest", "Nantes", "Bayonne", "Bordeaux",
+  "Toulouse", "Montpellier", "Marseille", "Nice", "Milano", "Nice",
+  "Lyon", "Lyon", "München", "Roma", "Bari", "Napoli", "Brindisi",
+  "Lamezia Terme", "Roma", "Napoli", "Bari", "Catania", "Brindisi",
+  "Milano"
+), weight = c(
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+)), class = c(
+  "tbl_df",
+  "tbl", "data.frame"
+), row.names = c(NA, -48L))
+
+highchartzero() %>%
+  hc_add_series(
+    type = "arcdiagram", data = list_parse(arc_data),
+    keys = c("from", "to", "weight")
+  ) %>%
+  hc_add_theme(hc_theme_darkunica()) %>%
+  tagList(
+    tags$script(src = "https://code.highcharts.com/modules/sankey.js"),
+    tags$script(src = "https://code.highcharts.com/modules/arc-diagram.js"), .
+  ) %>%
+  htmltools::browsable()
+```
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/arc-diagram/" target="_blank">arc-diagram</a></div>
+</div>
+
+``` 
+
+## bellcurve
+
+A bell curve is an areaspline series which represents the probability density function of the normal distribution. It calculates mean and standard deviation of the base series data and plots the curve according to the calculated parameters.
+
+
+```{r,eval=FALSE}
+
+c(
+  3.5, 3, 3.2, 3.1, 3.6, 3.9, 3.4, 3.4, 2.9, 3.1, 3.7, 3.4, 3, 3, 4,
+  4.4, 3.9, 3.5, 3.8, 3.8, 3.4, 3.7, 3.6, 3.3, 3.4, 3, 3.4, 3.5, 3.4, 3.2,
+  3.1, 3.4, 4.1, 4.2, 3.1, 3.2, 3.5, 3.6, 3, 3.4, 3.5, 2.3, 3.2, 3.5, 3.8, 3,
+  3.8, 3.2, 3.7, 3.3, 3.2, 3.2, 3.1, 2.3, 2.8, 2.8, 3.3, 2.4, 2.9, 2.7, 2, 3,
+  2.2, 2.9, 2.9, 3.1, 3, 2.7, 2.2, 2.5, 3.2, 2.8, 2.5, 2.8, 2.9, 3, 2.8, 3,
+  2.9, 2.6, 2.4, 2.4, 2.7, 2.7, 3, 3.4, 3.1, 2.3, 3, 2.5, 2.6, 3, 2.6, 2.3,
+  2.7, 3, 2.9, 2.9, 2.5, 2.8, 3.3, 2.7, 3, 2.9, 3, 3, 2.5, 2.9, 2.5, 3.6,
+  3.2, 2.7, 3, 2.5, 2.8, 3.2, 3, 3.8, 2.6, 2.2, 3.2, 2.8, 2.8, 2.7, 3.3, 3.2,
+  2.8, 3, 2.8, 3, 2.8, 3.8, 2.8, 2.8, 2.6, 3, 3.4, 3.1, 3, 3.1, 3.1, 3.1, 2.7,
+  3.2, 3.3, 3, 2.5, 3, 3.4, 3
+) %>%
+  {
+    dat <- .
+    highchartzero() %>%
+      hc_yAxis_multiples(create_axis(naxis = 2, heights = c(2, 1))) %>%
+      hc_xAxis_multiples(create_axis(naxis = 2, heights = c(2, 1))) %>%
+      hc_add_series(data = dat, type = "scatter") %>%
+      hc_add_series(data = dat, type = "bellcurve", baseSeries = 1, xAxis = 1, yAxis = 1) %>%
+      hc_add_dependency("modules/histogram-bellcurve.js")
+  }
+```
+
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/bellcurve/" target="_blank">bellcurve</a></div>
+</div>
+
+``` 
+
+
+
+
+
+
+## networkgraph
+
+A networkgraph is a type of relationship chart, where connnections(links) attracts nodes (points) and other nodes repulse each other.
+
+```{r,eval=FALSE}
+data(karate, package = "igraphdata")
+df <- igraph::as_data_frame(karate, what = "edges")
+
+highchartzero() %>%
+  hc_add_series(
+    df,
+    "networkgraph",
+    hcaes(from = from, to = to, weight = weight),
+    layoutAlgorithm = list(enableSimulation = TRUE)
+  ) %>%
+  hc_add_dependency("modules/networkgraph.js")
+
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/network-graph/" target="_blank">network-graph</a></div>
+</div>
+
+``` 
+
+## pareto
+
+A pareto diagram is a type of chart that contains both bars and a linegraph, where individual values are represented in descending order by bars, and the cumulative total is represented by the line.
+
+```{r,eval=FALSE}
+
+highchartzero() %>% 
+  hc_add_series(type = "column",data = catch_all_data %>% select(x,y)) %>% hc_add_series(type = "pareto",data = catch_all_data %>% select(x,y),baseSeries = 1) %>% 
+
+# catch_all_data %>%
+#   select(x, y) %>%
+#   hchart("pareto") %>%
+  # hc_add_series(type = "pareto",baseSeries = 1L,
+  #               tooltip = list(valueDecimals = 2)) %>%
+  hc_tooltip(shared = TRUE) %>%
+  hc_add_dependency("modules/pareto.js")
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/pareto/" target="_blank">pareto</a></div>
+</div>
+
+``` 
+
+
+
+
+
+## variablepie
+
+A variable pie series is a two dimensional series type, where each point renders an Y and Z value.  Each point is drawn as a pie slice where the size (arc) of the slice relates to the Y value and the radius of pie slice relates to the Z value.
+
+
+```{r,eval=FALSE}
+highchartzero() %>%
+  hc_add_series(type = "variablepie", data = catch_all_data) %>%
+  hc_add_dependency("modules/variable-pie.js")
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/variable-radius-pie/" target="_blank">variable-radius-pie</a></div>
+</div>
+
+``` 
+
+## variwide
+
+A variwide chart (related to marimekko chart) is a column chart with a variable width expressing a third dimension.
+
+
+```{r,eval=FALSE}
+highchartzero() %>%
+  hc_add_series(type = "variwide", data = catch_all_data) %>%
+  hc_add_dependency("modules/variwide.js")
+```
+
+
+```{=html}
+
+<div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/variwide/" target="_blank">variwide</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-variwide/inverted/" target="_blank">inverted</a></div>
+  <div><a href="https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/series-variwide/datetime/" target="_blank">datetime</a></div>
+</div>
+
+``` 
+
+
+
 
 

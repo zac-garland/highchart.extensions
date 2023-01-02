@@ -1,9 +1,5 @@
 add_multi_drop <- function(hc, selectors, selected = NULL) {
-  rand_id_begin <- paste(sample(letters, 3, replace = FALSE),
-    sample(letters, 4, replace = FALSE),
-    sample(letters, 3, replace = FALSE),
-    collapse = ""
-  ) %>% stringr::str_remove_all(" ")
+  rand_id_begin <- paste0(sample(letters,1),highcharter:::random_id())
 
   list_opts <- purrr::map(setNames(selectors, selectors), ~ {
     select_name <- .x
