@@ -1,3 +1,13 @@
+#' add multiple dropdowns automatically to existing highcharter plots
+#'
+#' @param hc highcharts object
+#' @param selectors the keys which to use for select dropdowns
+#' @param selected optional selected keys
+#' @return returns a browsable html object
+#' @seealso https://jkunst.com/highcharter/
+#' @export
+
+
 add_multi_drop <- function(hc, selectors, selected = NULL) {
   rand_id_begin <- paste0(sample(letters,1),highcharter:::random_id())
 
